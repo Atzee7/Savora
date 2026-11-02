@@ -117,7 +117,7 @@ async function submit(): Promise<void> {
         </form>
 
         <p class="mt-4 text-xs leading-relaxed text-stone-400">
-          Pendaftaran mitra toko akan tersedia pada tahap berikutnya melalui persetujuan admin.
+          Halaman ini hanya untuk akun customer. Akun mitra dibuat oleh admin Savora dan menggunakan halaman masuk yang sama.
         </p>
 
         <p class="mt-6 text-center text-sm text-stone-500">

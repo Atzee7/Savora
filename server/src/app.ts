@@ -4,8 +4,10 @@ import helmet from 'helmet'
 
 import { env } from './config/env.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
+import adminRouter from './modules/admin/router.js'
 import authRouter from './modules/auth/router.js'
 import healthRouter from './modules/health/router.js'
+import merchantRouter from './modules/merchant/router.js'
 import ordersRouter from './modules/orders/router.js'
 import storesRouter from './modules/stores/router.js'
 
@@ -30,6 +32,8 @@ app.get('/', (_req, res) => {
 
 app.use('/api/health', healthRouter)
 app.use('/api/auth', authRouter)
+app.use('/api/admin', adminRouter)
+app.use('/api/merchant', merchantRouter)
 app.use('/api/stores', storesRouter)
 app.use('/api/orders', ordersRouter)
 

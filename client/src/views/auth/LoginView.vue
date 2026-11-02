@@ -6,6 +6,7 @@ import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import { useAuthStore } from '@/stores/auth'
 import { getErrorMessage } from '@/utils/error'
+import { homePathForRole } from '@/utils/roleHome'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -29,8 +30,9 @@ async function submit(): Promise<void> {
 
   try {
     await auth.login({ email: form.email, password: form.password })
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/orders'
-    await router.push(redirect.startsWith('/') ? redirect : '/orders')
+    const fallback = homePathForRole(auth.role)
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : fallback
+    await router.push(redirect.startsWith('/') ? redirect : fallback)
   } catch (submitError) {
     error.value = getErrorMessage(submitError, 'Email atau password tidak valid.')
   } finally {
@@ -54,7 +56,7 @@ async function submit(): Promise<void> {
             Selamatkan makanan, hemat sampai 70%.
           </h1>
           <p class="mt-4 max-w-sm text-sm leading-relaxed text-brand-100">
-            Masuk untuk memesan Surprise Bag, melihat tiket pickup, dan menyimpan riwayat pesananmu.
+            Masuk untuk memesan Surprise Bag, mengelola toko mitra, atau memantau operasional platform.
           </p>
         </div>
         <div class="relative space-y-3 text-sm text-brand-100">
@@ -98,9 +100,12 @@ async function submit(): Promise<void> {
 
         <div class="mt-6 rounded-2xl border border-dashed border-brand-200 bg-brand-50/60 px-4 py-3">
           <p class="text-[11px] font-bold uppercase tracking-wide text-brand-700">Akun demo</p>
-          <p class="mt-1 text-xs leading-relaxed text-brand-900/70">
-            Customer: <strong>customer@savora.id</strong> · password <strong>password123</strong>
-          </p>
+          <div class="mt-2 space-y-1 text-xs leading-relaxed text-brand-900/70">
+            <p>Customer: <strong>customer@savora.id</strong></p>
+            <p>Mitra: <strong>merchant@savora.id</strong></p>
+            <p>Admin: <strong>admin@savora.id</strong></p>
+            <p>Password semua akun: <strong>password123</strong></p>
+          </div>
         </div>
 
         <p class="mt-6 text-center text-sm text-stone-500">

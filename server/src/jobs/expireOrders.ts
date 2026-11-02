@@ -2,12 +2,12 @@ import cron from 'node-cron'
 
 import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
+import { expireOverduePendingOrders } from '../utils/orderLifecycle.js'
 
 /**
  * Setiap menit:
+ *  - order PENDING yang lewat batas bayar menjadi EXPIRED dan stoknya dikembalikan.
  *  - order PAID yang melewati batas pickup menjadi EXPIRED (no refund).
- *
- * TODO(order-flow): batalkan order PENDING yang tidak dibayar dan kembalikan stok.
  */
 export function startExpireOrdersJob(): void {
   if (env.NODE_ENV === 'test') {
@@ -18,7 +18,9 @@ export function startExpireOrdersJob(): void {
     '* * * * *',
     async () => {
       try {
-        const result = await prisma.order.updateMany({
+        const pending = await expireOverduePendingOrders()
+
+        const paid = await prisma.order.updateMany({
           where: {
             status: 'PAID',
             expiresAt: { lt: new Date() },
@@ -26,8 +28,10 @@ export function startExpireOrdersJob(): void {
           data: { status: 'EXPIRED' },
         })
 
-        if (result.count > 0) {
-          console.log(`[jobs] ${result.count} pesanan ditandai EXPIRED.`)
+        if (pending > 0 || paid.count > 0) {
+          console.log(
+            `[jobs] ${pending} pesanan PENDING dibatalkan, ${paid.count} pesanan PAID kedaluwarsa.`,
+          )
         }
       } catch (error) {
         console.error('[jobs] Gagal memproses pesanan kedaluwarsa:', error)

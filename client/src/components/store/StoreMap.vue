@@ -4,7 +4,9 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import type { Store } from '@/types'
 
-const props = withDefaults(defineProps<{ stores: Store[]; height?: string }>(), {
+type MapStore = Pick<Store, 'id' | 'storeName' | 'address' | 'latitude' | 'longitude'>
+
+const props = withDefaults(defineProps<{ stores: MapStore[]; height?: string }>(), {
   height: '20rem',
 })
 

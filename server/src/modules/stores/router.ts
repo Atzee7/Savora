@@ -1,4 +1,4 @@
-import { Prisma, StoreStatus } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { Router } from 'express'
 import { z } from 'zod'
 
@@ -6,6 +6,8 @@ import { prisma } from '../../config/prisma.js'
 import { validate } from '../../middleware/validate.js'
 import { ApiError } from '../../utils/apiError.js'
 import { asyncHandler } from '../../utils/asyncHandler.js'
+import { upcomingScheduleToday } from '../../utils/schedule.js'
+import { OPERATIONAL_STORE_STATUSES } from '../../utils/storeStatus.js'
 import { dbTimeToString } from '../../utils/time.js'
 
 const router = Router()
@@ -14,7 +16,9 @@ type StoreWithRelations = Prisma.StoreGetPayload<{
   include: { schedules: true; tiers: true }
 }>
 
-function serializeStore(store: StoreWithRelations) {
+type ScheduleRow = StoreWithRelations['schedules'][number]
+
+function serializeStore(store: StoreWithRelations, schedules: ScheduleRow[] = store.schedules) {
   const tiers = [...store.tiers].sort((a, b) => a.price - b.price)
 
   return {
@@ -24,7 +28,7 @@ function serializeStore(store: StoreWithRelations) {
     latitude: store.latitude,
     longitude: store.longitude,
     status: store.status,
-    schedules: store.schedules.map((schedule) => ({
+    schedules: schedules.map((schedule) => ({
       id: schedule.id,
       pickupStart: dbTimeToString(schedule.pickupStart),
       pickupEnd: dbTimeToString(schedule.pickupEnd),
@@ -56,7 +60,7 @@ router.get(
 
     const stores = await prisma.store.findMany({
       where: {
-        status: StoreStatus.ACTIVE,
+        status: { in: OPERATIONAL_STORE_STATUSES },
         tiers: { some: { stock: { gt: 0 } } },
         ...(search
           ? {
@@ -68,13 +72,18 @@ router.get(
           : {}),
       },
       include: {
-        schedules: { orderBy: { pickupStart: 'asc' }, take: 1 },
+        schedules: { orderBy: { pickupStart: 'asc' } },
         tiers: true,
       },
       orderBy: { storeName: 'asc' },
     })
 
-    res.json(stores.map(serializeStore))
+    const visible = stores.flatMap((store) => {
+      const schedule = upcomingScheduleToday(store.schedules)
+      return schedule ? [serializeStore(store, [schedule])] : []
+    })
+
+    res.json(visible)
   }),
 )
 
@@ -85,16 +94,22 @@ router.get(
     const store = await prisma.store.findUnique({
       where: { id: req.params.id },
       include: {
-        schedules: { orderBy: { pickupStart: 'asc' }, take: 1 },
+        schedules: { orderBy: { pickupStart: 'asc' } },
         tiers: true,
       },
     })
 
-    if (!store || store.status !== StoreStatus.ACTIVE) {
+    if (!store || !OPERATIONAL_STORE_STATUSES.includes(store.status)) {
       throw new ApiError(404, 'Toko tidak ditemukan atau sedang tidak aktif.')
     }
 
-    res.json(serializeStore(store))
+    const schedule = upcomingScheduleToday(store.schedules)
+
+    if (!schedule) {
+      throw new ApiError(404, 'Toko sedang tutup. Jadwal pickup hari ini sudah lewat.')
+    }
+
+    res.json(serializeStore(store, [schedule]))
   }),
 )
 

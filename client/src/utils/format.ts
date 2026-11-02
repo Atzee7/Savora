@@ -19,3 +19,11 @@ export function formatDate(value: string | Date): string {
     timeZone: 'Asia/Jakarta',
   }).format(new Date(value))
 }
+
+export function formatTime(value: string | Date): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  }).format(new Date(value))
+}

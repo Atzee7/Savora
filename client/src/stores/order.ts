@@ -15,7 +15,7 @@ export const useOrderStore = defineStore('order', () => {
     error.value = null
 
     try {
-      orders.value = await orderService.mine()
+      orders.value = await orderService.listMine()
     } catch {
       error.value = 'Riwayat pesanan belum bisa dimuat.'
     } finally {

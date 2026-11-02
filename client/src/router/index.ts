@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import type { Role } from '@/types'
+import { homePathForRole } from '@/utils/roleHome'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -42,7 +44,7 @@ const router = createRouter({
     {
       path: '/',
       component: () => import('@/layouts/CustomerLayout.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ['CUSTOMER'] },
       children: [
         {
           path: 'checkout/:tierId',
@@ -67,6 +69,51 @@ const router = createRouter({
           name: 'orders',
           component: () => import('@/views/customer/OrdersView.vue'),
         },
+        {
+          path: 'orders/:orderId/feedback',
+          name: 'order-feedback',
+          component: () => import('@/views/customer/FeedbackView.vue'),
+          props: true,
+        },
+      ],
+    },
+    {
+      path: '/merchant',
+      component: () => import('@/layouts/MerchantLayout.vue'),
+      meta: { requiresAuth: true, roles: ['MERCHANT'] },
+      children: [
+        {
+          path: '',
+          name: 'merchant-dashboard',
+          component: () => import('@/views/merchant/DashboardView.vue'),
+        },
+        {
+          path: 'stock',
+          name: 'merchant-stock',
+          component: () => import('@/views/merchant/StockView.vue'),
+        },
+        {
+          path: 'verify',
+          name: 'merchant-verify',
+          component: () => import('@/views/merchant/VerifyPinView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/admin',
+      component: () => import('@/layouts/AdminLayout.vue'),
+      meta: { requiresAuth: true, roles: ['ADMIN'] },
+      children: [
+        {
+          path: '',
+          name: 'admin-merchants',
+          component: () => import('@/views/admin/MerchantsView.vue'),
+        },
+        {
+          path: 'monitoring',
+          name: 'admin-monitoring',
+          component: () => import('@/views/admin/MonitoringView.vue'),
+        },
       ],
     },
     {
@@ -82,6 +129,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  const allowedRoles = to.meta.roles as Role[] | undefined
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return {
@@ -90,8 +138,17 @@ router.beforeEach((to) => {
     }
   }
 
-  if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'orders' }
+  if (to.meta.requiresAuth && !auth.user) {
+    auth.logout()
+    return { name: 'login' }
+  }
+
+  if (allowedRoles && (!auth.role || !allowedRoles.includes(auth.role))) {
+    return { path: homePathForRole(auth.role) }
+  }
+
+  if (to.meta.guestOnly && auth.isAuthenticated && auth.user) {
+    return { path: homePathForRole(auth.role) }
   }
 
   return true

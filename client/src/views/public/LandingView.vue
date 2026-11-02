@@ -219,17 +219,19 @@ const tierPreview = [
                 <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Stok per tier dalam hitungan detik</li>
                 <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Rekap penjualan harian</li>
                 <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Terminal verifikasi PIN</li>
-                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Pendaftaran direview admin</li>
+                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Akun dibuat dan dikelola admin</li>
               </ul>
             </div>
             <div class="flex flex-col gap-3 lg:items-end">
               <RouterLink
-                to="/auth/register"
+                to="/auth/login"
                 class="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-bold text-brand-900 transition hover:bg-brand-50"
               >
-                Daftar sebagai mitra
+                Masuk sebagai mitra
               </RouterLink>
-              <p class="text-xs text-brand-300">Pendaftaran mitra tersedia pada tahap berikutnya.</p>
+              <p class="max-w-xs text-xs leading-relaxed text-brand-300 lg:text-right">
+                Akun mitra dibuat oleh admin Savora. Hubungi admin untuk bergabung, lalu masuk dengan kredensial yang diberikan.
+              </p>
             </div>
           </div>
         </div>

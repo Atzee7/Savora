@@ -7,6 +7,12 @@ export function dbTimeToString(value: Date): string {
   return value.toISOString().slice(11, 16)
 }
 
+/** Mengubah "HH:mm" menjadi Date 1970-01-01 UTC agar cocok dengan kolom TIME Prisma. */
+export function timeStringToDbDate(value: string): Date {
+  const [hour, minute] = value.split(':').map(Number)
+  return new Date(Date.UTC(1970, 0, 1, hour ?? 0, minute ?? 0))
+}
+
 export function nowInAppZone(): DateTime {
   return DateTime.now().setZone(APP_TIME_ZONE)
 }

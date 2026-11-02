@@ -1,7 +1,15 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
+
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
+
+async function logout(): Promise<void> {
+  auth.logout()
+  await router.push({ name: 'login' })
+}
 </script>
 
 <template>
@@ -29,7 +37,7 @@ const auth = useAuthStore()
           <button
             type="button"
             class="rounded-full border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:border-red-200 hover:text-red-600"
-            @click="auth.logout()"
+            @click="logout"
           >
             Keluar
           </button>
