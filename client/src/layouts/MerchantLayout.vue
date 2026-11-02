@@ -1,10 +1,33 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const initials = computed(() => {
+  const name = auth.user?.name?.trim()
+
+  if (!name) {
+    return 'M'
+  }
+
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+})
+
+const currentYear = new Date().getFullYear()
+
+const navItems = [
+  { to: '/merchant', label: 'Dasbor', exact: true },
+  { to: '/merchant/stock', label: 'Stok & jadwal', exact: false },
+  { to: '/merchant/verify', label: 'Verifikasi PIN', exact: false },
+]
 
 async function logout(): Promise<void> {
   auth.logout()
@@ -13,72 +36,91 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-stone-100">
-    <header class="border-b border-stone-200 bg-white">
-      <div class="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-        <RouterLink to="/merchant" class="flex items-center gap-2.5">
-          <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-base font-extrabold text-white">S</span>
-          <div class="leading-tight">
-            <p class="text-sm font-extrabold text-stone-900">Savora</p>
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">Mitra</p>
-          </div>
+  <div class="flex min-h-screen flex-col bg-sage-100">
+    <header class="sticky top-0 z-40 border-b border-ink-900/10 bg-sage-100/85 backdrop-blur">
+      <div class="container-page flex h-[4.5rem] items-center gap-4">
+        <RouterLink to="/merchant" class="flex shrink-0 items-center gap-2">
+          <span class="text-xl font-extrabold tracking-tight text-ink-950">Savora</span>
+          <span
+            class="rounded-full bg-ink-900 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white"
+          >
+            Mitra
+          </span>
         </RouterLink>
 
-        <nav class="flex items-center gap-0.5 sm:gap-1">
+        <nav class="ml-4 hidden items-center gap-1 md:flex" aria-label="Navigasi mitra">
           <RouterLink
-            to="/merchant"
-            class="rounded-lg px-2 py-2 text-xs font-semibold text-stone-600 transition hover:bg-stone-100 sm:px-3 sm:text-sm"
-            exact-active-class="bg-brand-50 text-brand-800"
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            class="rounded-full px-4 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950"
+            :exact-active-class="item.exact ? 'bg-ink-900 text-white hover:bg-ink-800 hover:text-white' : ''"
+            :active-class="item.exact ? '' : 'bg-ink-900 text-white hover:bg-ink-800 hover:text-white'"
           >
-            Dasbor
-          </RouterLink>
-          <RouterLink
-            to="/merchant/stock"
-            class="rounded-lg px-2 py-2 text-xs font-semibold text-stone-600 transition hover:bg-stone-100 sm:px-3 sm:text-sm"
-            active-class="bg-brand-50 text-brand-800"
-          >
-            Stok
-          </RouterLink>
-          <RouterLink
-            to="/merchant/verify"
-            class="rounded-lg px-2 py-2 text-xs font-semibold text-stone-600 transition hover:bg-stone-100 sm:px-3 sm:text-sm"
-            active-class="bg-brand-50 text-brand-800"
-          >
-            Verifikasi
-          </RouterLink>
-          <RouterLink
-            to="/catalog"
-            class="hidden rounded-lg px-3 py-2 text-sm font-semibold text-stone-500 transition hover:bg-stone-100 sm:block"
-          >
-            Katalog
+            {{ item.label }}
           </RouterLink>
         </nav>
 
-        <div class="flex items-center gap-2">
-          <span class="hidden max-w-[12rem] truncate text-xs font-semibold text-stone-500 sm:block">
-            {{ auth.user?.name }}
-          </span>
+        <div class="ml-auto flex items-center gap-2">
+          <RouterLink
+            to="/catalog"
+            class="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950 lg:inline-flex"
+          >
+            Lihat katalog
+          </RouterLink>
+
+          <div class="hidden items-center gap-2.5 sm:flex">
+            <span
+              class="grid h-9 w-9 place-items-center rounded-full border border-ink-900/10 bg-white text-[11px] font-extrabold text-ink-800"
+              aria-hidden="true"
+            >
+              {{ initials }}
+            </span>
+            <div class="hidden leading-tight lg:block">
+              <p class="max-w-[10rem] truncate text-xs font-bold text-ink-950">
+                {{ auth.user?.name }}
+              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">Mitra</p>
+            </div>
+          </div>
+
           <button
             type="button"
-            class="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:border-red-200 hover:text-red-600"
+            class="inline-flex min-h-10 items-center justify-center rounded-full border border-ink-900/15 bg-white px-3.5 py-2 text-xs font-semibold text-ink-800 transition hover:border-ink-900/30 hover:bg-sage-100"
             @click="logout"
           >
             Keluar
           </button>
         </div>
       </div>
+
+      <nav class="container-page no-scrollbar flex gap-1 overflow-x-auto pb-3 md:hidden" aria-label="Navigasi mitra">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950"
+          :exact-active-class="item.exact ? 'bg-ink-900 text-white' : ''"
+          :active-class="item.exact ? '' : 'bg-ink-900 text-white'"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </nav>
     </header>
 
     <main class="flex-1">
-      <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <div class="container-page py-8 sm:py-10">
         <RouterView />
       </div>
     </main>
 
-    <footer class="border-t border-stone-200 bg-white py-5">
-      <p class="mx-auto max-w-5xl px-4 text-xs text-stone-400 sm:px-6">
-        Akun mitra dikelola admin Savora. Hubungi admin jika ada perubahan data toko.
-      </p>
+    <footer class="border-t border-ink-900/10 bg-white">
+      <div
+        class="container-page flex flex-col gap-2 py-6 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p>© {{ currentYear }} Savora Mitra. Hyper-local food rescue Malang.</p>
+        <p>Akun mitra dikelola admin Savora. Hubungi admin untuk perubahan data toko.</p>
+      </div>
     </footer>
   </div>
 </template>

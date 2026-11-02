@@ -74,6 +74,7 @@ onMounted(() => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19,
+    detectRetina: true,
   }).addTo(map)
 
   markerLayer = L.layerGroup().addTo(map)

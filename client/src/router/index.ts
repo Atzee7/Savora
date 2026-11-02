@@ -122,8 +122,22 @@ const router = createRouter({
       component: () => import('@/views/NotFoundView.vue'),
     },
   ],
-  scrollBehavior() {
-    return { top: 0 }
+  scrollBehavior(to, _from, savedPosition) {
+    if (to.hash) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+      return {
+        el: to.hash,
+        top: 96,
+        behavior: reduceMotion ? 'auto' : 'smooth',
+      }
+    }
+
+    if (savedPosition) {
+      return { ...savedPosition, behavior: 'instant' }
+    }
+
+    return { top: 0, behavior: 'instant' }
   },
 })
 

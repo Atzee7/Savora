@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import AppButton from '@/components/common/AppButton.vue'
+import PageHero from '@/components/common/PageHero.vue'
 import { merchantService } from '@/services/merchant.service'
 import type { PinVerificationResult, Store } from '@/types'
 import { getErrorMessage } from '@/utils/error'
 import { formatRupiah, formatTime, formatTimeRange } from '@/utils/format'
+import { storeImage } from '@/utils/storeImage'
 
 const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
@@ -108,34 +111,77 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl">
-    <header>
-      <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-        Dasbor mitra / Verifikasi
-      </p>
-      <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
-        Terminal verifikasi PIN
-      </h1>
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500">
-        Minta PIN 4 digit dari customer, lalu masukkan lewat keypad. Pesanan harus berstatus dibayar dan masih dalam jam pickup.
-      </p>
-      <p v-if="store" class="mt-2 text-xs font-semibold text-stone-500">
-        {{ store.storeName }}
-        <template v-if="schedule"> · {{ formatTimeRange(schedule.pickupStart, schedule.pickupEnd) }}</template>
-      </p>
-    </header>
+  <div>
+    <RouterLink
+      to="/merchant"
+      class="inline-flex items-center gap-2 text-sm font-semibold text-ink-600 transition hover:text-ink-950"
+    >
+      <span aria-hidden="true">←</span> Kembali ke dasbor
+    </RouterLink>
 
-    <div class="mt-6 grid gap-5 lg:grid-cols-[20rem_1fr]">
-      <section class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-        <div class="flex justify-center gap-2">
+    <div class="mt-6">
+      <PageHero
+        :image="storeImage(store?.storeName ?? 'Savora')"
+        eyebrow="Terminal mitra"
+        title="Verifikasi PIN pickup"
+        description="Minta PIN 4 digit dari customer, lalu masukkan lewat keypad. Pesanan harus berstatus dibayar dan masih dalam jam pickup."
+      >
+        <template #badges>
+          <span
+            class="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur"
+          >
+            {{ store?.storeName ?? 'Toko mitra' }}
+          </span>
+          <span
+            class="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur"
+          >
+            PIN 4 digit
+          </span>
+        </template>
+
+        <template v-if="schedule" #aside>
+          <div class="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
+            <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-sage-200">
+              Jendela pickup
+            </p>
+            <p class="mt-1 text-lg font-extrabold text-white">
+              {{ formatTimeRange(schedule.pickupStart, schedule.pickupEnd) }}
+            </p>
+            <p class="mt-0.5 text-[11px] font-semibold text-sage-200">Waktu lokal WIB</p>
+          </div>
+        </template>
+
+        <template #meta>
+          <span class="inline-flex items-center gap-2">
+            <span class="h-1.5 w-1.5 rounded-full bg-brand-300" aria-hidden="true" />
+            Keypad fisik &amp; keyboard didukung
+          </span>
+          <span class="text-white/30" aria-hidden="true">·</span>
+          <span>PIN hanya bisa dipakai sekali</span>
+        </template>
+      </PageHero>
+    </div>
+
+    <div class="mt-6 grid gap-5 lg:grid-cols-[22rem_1fr]">
+      <section class="rounded-[2rem] border border-ink-900/10 bg-white p-6 shadow-card">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-brand-700">
+            PIN customer
+          </p>
+          <span class="text-[11px] font-semibold tabular-nums text-ink-600">
+            {{ pin.length }}/4
+          </span>
+        </div>
+
+        <div class="mt-4 grid grid-cols-4 gap-2" aria-hidden="true">
           <div
             v-for="index in 4"
             :key="index"
-            class="grid h-14 w-12 place-items-center rounded-xl border font-mono text-3xl font-extrabold transition"
+            class="grid h-16 place-items-center rounded-2xl border-2 font-mono text-3xl font-extrabold transition"
             :class="
               pin.length >= index
-                ? 'border-brand-300 bg-brand-50 text-brand-900'
-                : 'border-stone-200 bg-stone-50 text-stone-300'
+                ? 'border-brand-700 bg-brand-50 text-brand-900'
+                : 'border-ink-900/10 bg-sage-50 text-ink-300'
             "
           >
             {{ pin[index - 1] ?? '·' }}
@@ -147,7 +193,7 @@ onBeforeUnmount(() => {
             v-for="digit in digits"
             :key="digit"
             type="button"
-            class="h-14 rounded-xl border border-stone-200 bg-white font-mono text-xl font-bold text-stone-800 transition hover:border-brand-300 hover:bg-brand-50 active:scale-[0.98] disabled:opacity-50"
+            class="h-14 rounded-2xl border border-ink-900/10 bg-white font-mono text-xl font-bold text-ink-900 transition hover:border-ink-900/30 hover:bg-sage-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="verifying"
             @click="appendDigit(digit)"
           >
@@ -155,7 +201,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="h-14 rounded-xl border border-stone-200 bg-stone-50 text-xs font-bold uppercase tracking-wide text-stone-500 transition hover:bg-stone-100 disabled:opacity-50"
+            class="h-14 rounded-2xl border border-ink-900/10 bg-sage-100 text-xs font-bold uppercase tracking-[0.12em] text-ink-600 transition hover:bg-sage-200 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="verifying"
             @click="clearPin"
           >
@@ -163,7 +209,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="h-14 rounded-xl border border-stone-200 bg-white font-mono text-xl font-bold text-stone-800 transition hover:border-brand-300 hover:bg-brand-50 active:scale-[0.98] disabled:opacity-50"
+            class="h-14 rounded-2xl border border-ink-900/10 bg-white font-mono text-xl font-bold text-ink-900 transition hover:border-ink-900/30 hover:bg-sage-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="verifying"
             @click="appendDigit('0')"
           >
@@ -171,7 +217,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="h-14 rounded-xl border border-stone-200 bg-stone-50 text-lg font-bold text-stone-500 transition hover:bg-stone-100 disabled:opacity-50"
+            class="h-14 rounded-2xl border border-ink-900/10 bg-sage-100 text-lg font-bold text-ink-600 transition hover:bg-sage-200 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="verifying"
             aria-label="Hapus digit terakhir"
             @click="removeDigit"
@@ -180,21 +226,18 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <button
-          type="button"
-          class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+        <AppButton
+          variant="ink"
+          size="lg"
+          class="mt-4 w-full"
+          :loading="verifying"
           :disabled="!canSubmit"
           @click="verify"
         >
-          <span
-            v-if="verifying"
-            class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-            aria-hidden="true"
-          />
           {{ verifying ? 'Memeriksa PIN...' : 'Verifikasi PIN' }}
-        </button>
+        </AppButton>
 
-        <p class="mt-3 text-center text-[11px] leading-relaxed text-stone-400">
+        <p class="mt-3 text-center text-[11px] leading-relaxed text-ink-500">
           Bisa juga pakai keyboard: angka, Backspace, Enter.
         </p>
       </section>
@@ -202,60 +245,130 @@ onBeforeUnmount(() => {
       <div class="space-y-4">
         <section
           v-if="result"
-          class="rounded-3xl border border-emerald-200 bg-emerald-50 p-5"
+          class="rounded-[2rem] border border-brand-200 bg-brand-50 p-6"
+          role="status"
         >
-          <div class="flex items-start gap-3">
-            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-600 text-xl text-white">✓</span>
-            <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">Pickup berhasil</p>
-              <h2 class="mt-1 text-lg font-extrabold text-emerald-950">{{ result.customerName }}</h2>
-              <p class="mt-1 text-sm text-emerald-800">
+          <div class="flex items-start gap-4">
+            <span
+              class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-700 text-white"
+            >
+              <svg
+                class="h-6 w-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m5 13 4 4 10-10" />
+              </svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-brand-700">
+                Pickup berhasil
+              </p>
+              <h2 class="mt-1 text-xl font-extrabold tracking-tight text-brand-950">
+                {{ result.customerName }}
+              </h2>
+              <p class="mt-1 text-sm font-semibold text-brand-800">
                 {{ result.tierName }} × {{ result.qty }} · {{ formatRupiah(result.totalPrice) }}
               </p>
-              <p class="mt-1 text-xs text-emerald-700">
-                Diverifikasi pukul {{ formatTime(result.completedAt) }} WIB. Status pesanan menjadi COMPLETED.
+              <p class="mt-1 text-xs leading-relaxed text-brand-700">
+                Diverifikasi pukul {{ formatTime(result.completedAt) }} WIB. Status pesanan menjadi
+                selesai.
               </p>
+              <AppButton variant="secondary" size="sm" class="mt-4" @click="clearPin">
+                Verifikasi PIN berikutnya
+              </AppButton>
             </div>
           </div>
         </section>
 
-        <section v-else-if="error" class="rounded-3xl border border-red-200 bg-red-50 p-5">
-          <div class="flex items-start gap-3">
-            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-xl text-red-700">!</span>
+        <section v-else-if="error" class="rounded-[2rem] border border-red-200 bg-red-50 p-6" role="alert">
+          <div class="flex items-start gap-4">
+            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-red-100 text-red-700">
+              <svg
+                class="h-6 w-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 8v5M12 17h.01" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            </span>
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-red-600">Verifikasi gagal</p>
+              <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-red-600">
+                Verifikasi gagal
+              </p>
               <p class="mt-1 text-sm leading-relaxed text-red-800">{{ error }}</p>
-              <p class="mt-2 text-xs leading-relaxed text-red-600">
-                Periksa PIN bersama customer. Jika waktu pickup sudah lewat, tiket tidak bisa diverifikasi.
+              <p class="mt-2 text-xs leading-relaxed text-red-700">
+                Periksa PIN bersama customer. Jika waktu pickup sudah lewat, tiket tidak bisa
+                diverifikasi.
               </p>
             </div>
           </div>
         </section>
 
-        <section v-else class="rounded-3xl border border-stone-200 bg-white p-5">
-          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Panduan singkat</p>
-          <ol class="mt-3 space-y-3">
-            <li class="flex gap-3 text-sm leading-relaxed text-stone-600">
-              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-100 text-[11px] font-extrabold text-stone-600">1</span>
+        <section v-else class="rounded-[2rem] border border-ink-900/10 bg-white p-6 shadow-card">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-brand-700">
+            Panduan singkat
+          </p>
+          <h2 class="mt-2 text-lg font-extrabold tracking-tight text-ink-950">
+            Empat langkah, selesai.
+          </h2>
+          <ol class="mt-5 space-y-3.5">
+            <li class="flex gap-3 text-sm leading-relaxed text-ink-600">
+              <span
+                class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-extrabold text-white"
+              >
+                1
+              </span>
               Cocokkan pesanan customer dengan kantong yang disiapkan.
             </li>
-            <li class="flex gap-3 text-sm leading-relaxed text-stone-600">
-              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-100 text-[11px] font-extrabold text-stone-600">2</span>
+            <li class="flex gap-3 text-sm leading-relaxed text-ink-600">
+              <span
+                class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-extrabold text-white"
+              >
+                2
+              </span>
               Minta customer menunjukkan tiket dan PIN 4 digit.
             </li>
-            <li class="flex gap-3 text-sm leading-relaxed text-stone-600">
-              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-100 text-[11px] font-extrabold text-stone-600">3</span>
-              Masukkan PIN. Sistem hanya menerima tiket PAID yang masih dalam jam pickup.
+            <li class="flex gap-3 text-sm leading-relaxed text-ink-600">
+              <span
+                class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-extrabold text-white"
+              >
+                3
+              </span>
+              Masukkan PIN. Sistem hanya menerima tiket aktif yang masih dalam jam pickup.
             </li>
-            <li class="flex gap-3 text-sm leading-relaxed text-stone-600">
-              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-100 text-[11px] font-extrabold text-stone-600">4</span>
+            <li class="flex gap-3 text-sm leading-relaxed text-ink-600">
+              <span
+                class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-extrabold text-white"
+              >
+                4
+              </span>
               Setelah berhasil, serahkan kantong dan status pesanan menjadi selesai.
             </li>
           </ol>
         </section>
 
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
-          PIN hanya bisa dipakai sekali. Jika customer kehilangan tiket, minta mereka membuka halaman Pesanan terlebih dahulu.
+        <div
+          class="rounded-[2rem] border border-ink-900/10 bg-sage-200/70 p-5 text-xs leading-relaxed text-ink-700"
+        >
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-brand-800">
+            Pengingat
+          </p>
+          <p class="mt-2">
+            PIN hanya bisa dipakai sekali. Jika customer kehilangan tiket, minta mereka membuka
+            halaman Pesanan terlebih dahulu.
+          </p>
         </div>
       </div>
     </div>

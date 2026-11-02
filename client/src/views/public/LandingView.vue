@@ -1,238 +1,409 @@
 <script setup lang="ts">
-import { formatRupiah } from '@/utils/format'
+import { computed, onMounted } from 'vue'
 
-const tierPreview = [
+import FeatureCard from '@/components/home/FeatureCard.vue'
+import StepItem from '@/components/home/StepItem.vue'
+import TierCard from '@/components/home/TierCard.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { useAuthStore } from '@/stores/auth'
+import { useCatalogStore } from '@/stores/catalog'
+
+const auth = useAuthStore()
+const catalog = useCatalogStore()
+
+useAutoRefresh(() => catalog.refreshStores(), { interval: 30_000 })
+
+const stores = computed(() => catalog.stores)
+const totalBags = computed(() =>
+  stores.value.reduce((total, store) => total + store.totalStock, 0),
+)
+
+const heroBadge = computed(() => {
+  if (catalog.loading) {
+    return 'Memuat kantong malam ini'
+  }
+
+  if (stores.value.length === 0) {
+    return 'Stok dibuka menjelang pickup'
+  }
+
+  return `${totalBags.value} kantong dari ${stores.value.length} toko`
+})
+
+const stats = [
+  { icon: 'tier', value: '3', label: 'Tier harga tetap' },
+  { icon: 'save', value: '70%', label: 'Hemat maksimal' },
+  { icon: 'area', value: '5', label: 'Area layanan' },
+] as const
+
+const features = [
   {
-    label: 'Hemat',
+    icon: 'leaf',
+    title: 'Surplus yang masih layak',
+    description:
+      'Toko hanya menjual makanan yang tidak habis di hari itu, bukan makanan yang sudah tidak layak.',
+  },
+  {
+    icon: 'tag',
+    title: 'Harga pasti, isi kejutan',
+    description:
+      'Pilih tier Hemat, Reguler, atau Besar. Nilai asli setiap kantong dijamin sesuai tier.',
+  },
+  {
+    icon: 'ticket',
+    title: 'Ambil sendiri dengan PIN',
+    description:
+      'Bayar sekali, dapat tiket digital dan PIN 4 digit, lalu ambil di toko pada jam pickup.',
+  },
+] as const
+
+const steps = [
+  {
+    icon: 'bag',
+    title: 'Pilih toko dan tier',
+    description:
+      'Lihat toko yang buka malam ini, cek jam pickup dan sisa kantong, lalu pilih tier yang paling pas.',
+  },
+  {
+    icon: 'card',
+    title: 'Bayar dan dapat PIN',
+    description:
+      'Selesaikan pembayaran sandbox. Tiket aktif dan PIN 4 digit langsung dibuat untuk pickup.',
+  },
+  {
+    icon: 'pin',
+    title: 'Ambil di jam pickup',
+    description:
+      'Datang ke toko, tunjukkan PIN ke kasir, lalu bawa pulang Surprise Bag kamu.',
+  },
+] as const
+
+const tierCards = [
+  {
+    name: 'Hemat',
     price: 15000,
     original: 45000,
-    emoji: '🥯',
+    image: '/images/store-bakery.webp',
     description: 'Camilan atau makan ringan untuk satu orang.',
   },
   {
-    label: 'Reguler',
+    name: 'Reguler',
     price: 25000,
     original: 75000,
-    emoji: '🥐',
-    description: 'Paling seimbang untuk makan kenyang.',
+    image: '/images/tier-reguler.webp',
+    description: 'Porsi makan lengkap, pas untuk satu orang lapar.',
   },
   {
-    label: 'Besar',
+    name: 'Besar',
     price: 35000,
     original: 105000,
-    emoji: '🥖',
-    description: 'Isi lebih banyak, cocok dibagi.',
+    image: '/images/tier-besar.webp',
+    description: 'Isi lebih banyak, cocok dibagi atau disimpan.',
   },
-]
+] as const
+
+onMounted(() => {
+  void catalog.fetchStores()
+})
 </script>
 
 <template>
   <div>
-    <section class="relative overflow-hidden">
-      <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-50 via-stone-50 to-stone-50" />
-      <div class="absolute -left-24 top-24 -z-10 h-72 w-72 rounded-full bg-brand-200/30 blur-3xl" />
-      <div class="absolute -right-16 top-0 -z-10 h-80 w-80 rounded-full bg-accent-200/30 blur-3xl" />
-
-      <div class="container-page grid gap-14 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
-        <div>
-          <span class="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-brand-700">
-            🌱 Food rescue hyper-local · Malang
-          </span>
-          <h1 class="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
-            Makan enak,
-            <span class="text-brand-700">selamatkan makanan</span>,
-            hemat sampai 70%.
-          </h1>
-          <p class="mt-5 max-w-xl text-base leading-relaxed text-stone-600 sm:text-lg">
-            Savora menghubungkan kamu dengan roti, kafe, dan restoran favorit di Malang yang punya surplus
-            makanan layak konsumsi menjelang tutup. Pesan <em>Surprise Bag</em>, ambil sendiri, bayar jauh lebih murah.
-          </p>
-
-          <div class="mt-8 flex flex-wrap items-center gap-3">
-            <RouterLink
-              to="/catalog"
-              class="inline-flex items-center justify-center rounded-full bg-brand-700 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-800"
-            >
-              Jelajahi Surprise Bag
-            </RouterLink>
-            <a
-              href="#cara-kerja"
-              class="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-6 py-3.5 text-sm font-bold text-stone-700 transition hover:border-brand-300 hover:text-brand-700"
-            >
-              Lihat cara kerja
-            </a>
-          </div>
-
-          <div class="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-xs font-semibold text-stone-500">
-            <span class="flex items-center gap-2"><span class="text-brand-600">✓</span> 3 tier harga tetap</span>
-            <span class="flex items-center gap-2"><span class="text-brand-600">✓</span> Self-pickup dengan PIN</span>
-            <span class="flex items-center gap-2"><span class="text-brand-600">✓</span> Tanpa biaya layanan</span>
-          </div>
-        </div>
-
-        <div class="relative mx-auto w-full max-w-md lg:mr-0">
-          <div class="absolute -right-3 -top-3 z-10 rotate-3 rounded-2xl bg-accent-400 px-4 py-2 text-xs font-extrabold text-stone-900 shadow-lg">
-            Hemat 67%
-          </div>
-
-          <div class="overflow-hidden rounded-[2rem] border border-brand-100 bg-white shadow-card">
-            <div class="relative h-44 bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-6 text-white">
-              <div class="absolute -right-8 top-2 h-36 w-36 rounded-full border-[18px] border-white/10" />
-              <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-100">Surprise Bag hari ini</p>
-              <h2 class="mt-2 max-w-[15rem] text-2xl font-extrabold leading-tight">Roti artisanal sisa oven terakhir</h2>
-              <p class="mt-2 text-sm text-brand-100">Roti Asri Lowokwaru · 1,2 km</p>
-            </div>
-
-            <div class="space-y-4 p-6">
-              <div class="flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3">
-                <div>
-                  <p class="text-[11px] font-bold uppercase tracking-wide text-stone-400">Tier Reguler</p>
-                  <p class="mt-0.5 text-sm font-semibold text-stone-700">Senilai min. {{ formatRupiah(75000) }}</p>
-                </div>
-                <p class="text-xl font-extrabold text-brand-700">{{ formatRupiah(25000) }}</p>
-              </div>
-
-              <div class="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                <span class="rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">Ambil 20.00–21.30 WIB</span>
-                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">Sisa 3 kantong</span>
-              </div>
-
-              <div class="flex items-center justify-between border-t border-dashed border-stone-200 pt-4">
-                <div class="flex items-center gap-2 text-xs text-stone-500">
-                  <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-50 text-brand-700">PIN</span>
-                  Tunjukkan PIN saat ambil
-                </div>
-                <span class="rounded-full bg-stone-900 px-4 py-2 text-xs font-bold text-white">4 8 2 1</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="border-y border-stone-200 bg-white">
-      <div class="container-page grid grid-cols-2 divide-x divide-stone-100 sm:grid-cols-4">
-        <div class="px-4 py-6 text-center sm:px-6">
-          <p class="text-2xl font-extrabold text-brand-700">60–70%</p>
-          <p class="mt-1 text-xs font-semibold text-stone-500">Lebih murah</p>
-        </div>
-        <div class="px-4 py-6 text-center sm:px-6">
-          <p class="text-2xl font-extrabold text-brand-700">3</p>
-          <p class="mt-1 text-xs font-semibold text-stone-500">Tier harga tetap</p>
-        </div>
-        <div class="px-4 py-6 text-center sm:px-6">
-          <p class="text-2xl font-extrabold text-brand-700">4 digit</p>
-          <p class="mt-1 text-xs font-semibold text-stone-500">PIN pickup aman</p>
-        </div>
-        <div class="px-4 py-6 text-center sm:px-6">
-          <p class="text-2xl font-extrabold text-brand-700">0</p>
-          <p class="mt-1 text-xs font-semibold text-stone-500">Biaya layanan</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="cara-kerja" class="scroll-mt-20 py-16 sm:py-24">
+    <section class="pt-5 sm:pt-8">
       <div class="container-page">
-        <div class="mx-auto max-w-2xl text-center">
-          <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">Cara kerja</p>
-          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-stone-900 sm:text-4xl">
-            Tiga langkah, makanan terselamatkan.
-          </h2>
-          <p class="mt-4 text-sm leading-relaxed text-stone-600 sm:text-base">
-            Tanpa antre panjang, tanpa memilih satu per satu. Cukup pilih tier, bayar, lalu ambil di toko.
-          </p>
-        </div>
+        <div class="relative overflow-hidden rounded-[2rem] bg-ink-950">
+          <img
+            src="/images/hero-savora.webp"
+            alt="Rak roti dan pastry di toko roti menjelang tutup"
+            class="absolute inset-0 h-full w-full object-cover object-center"
+            fetchpriority="high"
+          />
+          <div
+            class="absolute inset-0 bg-gradient-to-b from-ink-950/75 via-ink-950/35 to-ink-950/85"
+          />
 
-        <div class="mt-12 grid gap-5 md:grid-cols-3">
-          <div class="card p-6">
-            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-2xl">🔍</span>
-            <p class="mt-5 text-xs font-bold text-brand-600">01</p>
-            <h3 class="mt-1 text-lg font-bold text-stone-900">Pilih toko & tier</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">
-              Lihat toko di sekitar Malang, cek sisa kantong dan jam pickup, lalu pilih tier Hemat, Reguler, atau Besar.
-            </p>
-          </div>
-          <div class="card p-6">
-            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-accent-50 text-2xl">💳</span>
-            <p class="mt-5 text-xs font-bold text-accent-600">02</p>
-            <h3 class="mt-1 text-lg font-bold text-stone-900">Bayar & dapat PIN</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">
-              Checkout simulasi QRIS atau e-wallet. Setelah berhasil, tiket aktif dan PIN 4 digit langsung dibuat.
-            </p>
-          </div>
-          <div class="card p-6">
-            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-orange-50 text-2xl">🎒</span>
-            <p class="mt-5 text-xs font-bold text-orange-600">03</p>
-            <h3 class="mt-1 text-lg font-bold text-stone-900">Ambil di toko</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">
-              Datang di jam pickup, tunjukkan PIN ke kasir. Isi kantongnya kejutan, nilainya dijamin sesuai tier.
-            </p>
+          <div
+            class="relative flex min-h-[34rem] flex-col justify-between p-6 sm:min-h-[38rem] sm:p-10 lg:min-h-[42rem] lg:p-14"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <span
+                class="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-brand-300" aria-hidden="true" />
+                Food rescue
+              </span>
+              <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-sage-100">
+                Malang, ID
+              </span>
+            </div>
+
+            <div class="flex flex-1 flex-col items-center justify-center py-10 text-center">
+              <h1
+                class="select-none pl-[0.12em] text-[clamp(3rem,14vw,10.5rem)] font-extrabold leading-none tracking-[0.12em] text-white"
+              >
+                SAVORA
+              </h1>
+              <p class="mt-5 max-w-xl text-sm leading-relaxed text-sage-100 sm:text-base">
+                Selamatkan makanan layak dari toko Malang. Pesan Surprise Bag, ambil sendiri, bayar
+                hingga 70 persen lebih murah.
+              </p>
+
+              <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <RouterLink
+                  to="/catalog"
+                  class="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-7 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-sage-100"
+                >
+                  Cari Surprise Bag
+                </RouterLink>
+                <a
+                  href="#cara-kerja"
+                  class="inline-flex min-h-12 items-center justify-center rounded-full border border-white/40 px-6 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/10"
+                >
+                  Lihat cara kerja
+                </a>
+              </div>
+            </div>
+
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 border-t border-white/15 pt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-sage-200"
+            >
+              <span class="inline-flex items-center gap-2">
+                <span class="h-1.5 w-1.5 rounded-full bg-brand-300" aria-hidden="true" />
+                {{ heroBadge }}
+              </span>
+              <div class="flex flex-wrap items-center gap-2">
+                <span>Pickup malam ini</span>
+                <LiveBadge tone="dark" :updated-at="catalog.lastUpdated" label="Stok otomatis" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <section class="bg-white py-16 sm:py-24">
-      <div class="container-page">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">Tier standar</p>
-            <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-stone-900 sm:text-4xl">
-              Harga jelas, isi tetap kejutan.
-            </h2>
-          </div>
-          <p class="max-w-md text-sm leading-relaxed text-stone-500">
-            Kami mengunci tiga tier agar kasir tidak perlu menghitung satu per satu. Setiap kantong berisi makanan
-            dengan nilai asli minimal sesuai tier.
+      <div class="container-page grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-20">
+        <div v-reveal>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+            Kenapa Savora
           </p>
+          <h2
+            class="mt-4 max-w-xl text-3xl font-extrabold leading-tight tracking-tight text-ink-950 sm:text-4xl"
+          >
+            Makan malam lebih murah, tanpa rasa bersalah.
+          </h2>
+          <p class="mt-5 max-w-lg text-sm leading-relaxed text-ink-600 sm:text-base">
+            Savora bukan aplikasi diskon biasa. Kami bekerja dengan toko di Malang untuk menjual
+            makanan yang masih layak sebelum tutup, dalam paket yang isinya kejutan.
+          </p>
+
+          <div class="mt-10 grid grid-cols-3 gap-4 sm:gap-6">
+            <div v-for="stat in stats" :key="stat.label">
+              <span
+                class="grid h-11 w-11 place-items-center rounded-full border border-ink-900/15 text-ink-900"
+              >
+                <svg
+                  v-if="stat.icon === 'tier'"
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 7h16M7 12h10M10 17h4" />
+                </svg>
+                <svg
+                  v-else-if="stat.icon === 'save'"
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="m8.5 15.5 7-7M9 9.5h.01M15 14.5h.01" />
+                </svg>
+                <svg
+                  v-else
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+              </span>
+              <p class="mt-4 text-2xl font-extrabold tracking-tight text-ink-950">
+                {{ stat.value }}
+              </p>
+              <p class="mt-1 text-xs font-semibold leading-snug text-ink-500">{{ stat.label }}</p>
+            </div>
+          </div>
         </div>
 
-        <div class="mt-10 grid gap-5 md:grid-cols-3">
-          <div v-for="tier in tierPreview" :key="tier.label" class="card p-6 transition hover:-translate-y-1 hover:shadow-card">
-            <div class="flex items-center justify-between">
-              <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-bold text-stone-600">{{ tier.label }}</span>
-              <span class="text-3xl">{{ tier.emoji }}</span>
-            </div>
-            <p class="mt-6 text-3xl font-extrabold text-stone-900">{{ formatRupiah(tier.price) }}</p>
-            <p class="mt-1 text-xs font-semibold text-stone-400">Nilai asli min. {{ formatRupiah(tier.original) }}</p>
-            <p class="mt-4 text-sm leading-relaxed text-stone-500">{{ tier.description }}</p>
-          </div>
+        <div class="grid gap-4">
+          <FeatureCard
+            v-for="(feature, index) in features"
+            :key="feature.title"
+            v-reveal="{ delay: index * 80 }"
+            :icon="feature.icon"
+            :title="feature.title"
+            :description="feature.description"
+          />
         </div>
       </div>
     </section>
 
-    <section id="untuk-mitra" class="scroll-mt-20 py-16 sm:py-24">
+    <section class="pb-16 sm:pb-24">
       <div class="container-page">
-        <div class="relative overflow-hidden rounded-[2rem] bg-brand-900 p-8 text-white sm:p-12">
-          <div class="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-brand-700/50 blur-2xl" />
-          <div class="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-accent-500/20 blur-3xl" />
-          <div class="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-300">Untuk mitra toko</p>
-              <h2 class="mt-3 max-w-xl text-3xl font-extrabold tracking-tight sm:text-4xl">
-                Selamatkan modal bahan baku, tanpa ribet menghitung sisa satu per satu.
-              </h2>
-              <p class="mt-4 max-w-xl text-sm leading-relaxed text-brand-100">
-                Buka stok Surprise Bag harian, atur jam pickup, dan validasi PIN pembeli langsung dari dasbor kasir.
-              </p>
-              <ul class="mt-6 grid gap-2 text-sm text-brand-100 sm:grid-cols-2">
-                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Stok per tier dalam hitungan detik</li>
-                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Rekap penjualan harian</li>
-                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Terminal verifikasi PIN</li>
-                <li class="flex items-center gap-2"><span class="text-accent-300">✓</span> Akun dibuat dan dikelola admin</li>
-              </ul>
-            </div>
-            <div class="flex flex-col gap-3 lg:items-end">
-              <RouterLink
-                to="/auth/login"
-                class="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-bold text-brand-900 transition hover:bg-brand-50"
+        <div class="grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div v-reveal class="max-w-xl">
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+              Satu harga, tiga ukuran
+            </p>
+            <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-950 sm:text-4xl">
+              Tiga tier, isi selalu kejutan.
+            </h2>
+            <p class="mt-4 text-sm leading-relaxed text-ink-600 sm:text-base">
+              Hemat, Reguler, dan Besar. Nilai asli setiap kantong dijamin sesuai tier, tanpa
+              kejutan harga.
+            </p>
+          </div>
+
+          <RouterLink
+            to="/catalog"
+            class="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-full bg-ink-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800"
+          >
+            Lihat katalog
+            <svg
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 10h12M11 5l5 5-5 5" />
+            </svg>
+          </RouterLink>
+        </div>
+
+        <div class="mt-10 grid gap-4 lg:mt-12 lg:grid-cols-3 lg:gap-5">
+          <TierCard
+            v-for="(tier, index) in tierCards"
+            :key="tier.name"
+            v-reveal="{ delay: index * 80 }"
+            :index="index + 1"
+            :name="tier.name"
+            :price="tier.price"
+            :original="tier.original"
+            :image="tier.image"
+            :description="tier.description"
+            :featured="index === 1"
+            class="lg:last:mt-8 lg:first:mt-8"
+          />
+        </div>
+
+        <div
+          v-reveal
+          class="mt-6 flex flex-col gap-2 rounded-2xl border border-ink-900/10 bg-white/60 px-5 py-4 text-xs font-semibold text-ink-600 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p>Harga tier sama di semua toko. Isi kantong mengikuti stok hari itu.</p>
+          <p class="text-ink-600">Ambil sendiri di toko pada jam pickup.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="cara-kerja" class="scroll-mt-24 bg-white py-16 sm:py-24">
+      <div class="container-page">
+        <div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-16">
+          <div v-reveal>
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+              Cara kerja
+            </p>
+            <h2
+              class="mt-4 max-w-xl text-3xl font-extrabold leading-[1.05] tracking-tight text-ink-950 sm:text-4xl lg:text-5xl"
+            >
+              Pesan semudah 1-2-3.
+            </h2>
+          </div>
+
+          <p v-reveal="{ delay: 80 }" class="max-w-md text-sm leading-relaxed text-ink-600 sm:text-base lg:pb-1">
+            Tiga langkah dari memilih kantong sampai membawanya pulang. Semua pengambilan dilakukan
+            sendiri di toko pada jam pickup.
+          </p>
+        </div>
+
+        <div class="mt-10 border-t border-ink-900/10 lg:mt-14" aria-hidden="true" />
+
+        <div class="relative mt-10 lg:mt-12">
+          <span
+            class="pointer-events-none absolute left-7 right-7 top-7 hidden border-t border-dashed border-ink-900/20 lg:block"
+            aria-hidden="true"
+          />
+
+          <ol class="relative grid gap-10 lg:grid-cols-3 lg:gap-8">
+            <StepItem
+              v-for="(step, index) in steps"
+              :key="step.title"
+              v-reveal="{ delay: index * 90 }"
+              :index="index + 1"
+              :icon="step.icon"
+              :title="step.title"
+              :description="step.description"
+              :last="index === steps.length - 1"
+            />
+          </ol>
+        </div>
+
+        <div
+          v-reveal
+          class="mt-12 flex flex-col gap-5 border-t border-ink-900/10 pt-8 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p class="max-w-md text-sm leading-relaxed text-ink-600">
+            Stok dibuka menjelang jam pickup. Setiap kantong dijamin sesuai nilai tier yang kamu
+            pilih.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <RouterLink
+              to="/catalog"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink-800"
+            >
+              Cari Surprise Bag
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
               >
-                Masuk sebagai mitra
-              </RouterLink>
-              <p class="max-w-xs text-xs leading-relaxed text-brand-300 lg:text-right">
-                Akun mitra dibuat oleh admin Savora. Hubungi admin untuk bergabung, lalu masuk dengan kredensial yang diberikan.
-              </p>
-            </div>
+                <path d="M4 10h12M11 5l5 5-5 5" />
+              </svg>
+            </RouterLink>
+
+            <RouterLink
+              v-if="auth.isAuthenticated && auth.role === 'CUSTOMER'"
+              to="/orders"
+              class="inline-flex min-h-11 items-center justify-center rounded-full border border-ink-900/20 px-5 py-2.5 text-sm font-semibold text-ink-800 transition hover:bg-sage-100"
+            >
+              Pesanan saya
+            </RouterLink>
           </div>
         </div>
       </div>

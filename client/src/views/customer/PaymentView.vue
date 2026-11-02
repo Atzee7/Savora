@@ -2,13 +2,18 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
+import PageHero from '@/components/common/PageHero.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { orderService } from '@/services/order.service'
 import type { Order, TierName } from '@/types'
 import { formatCountdown, remainingMs } from '@/utils/countdown'
 import { getErrorMessage } from '@/utils/error'
 import { formatRupiah, formatTimeRange } from '@/utils/format'
+import { storeImage } from '@/utils/storeImage'
 
 const props = defineProps<{ orderId: string }>()
 
@@ -57,6 +62,7 @@ async function load(): Promise<void> {
     }
 
     order.value = loaded
+    lastUpdated.value = new Date()
   } catch (error) {
     order.value = null
     loadError.value = getErrorMessage(error, 'Pesanan belum bisa dimuat.')
@@ -64,6 +70,27 @@ async function load(): Promise<void> {
     loading.value = false
   }
 }
+
+/** Menangkap pembayaran, pembatalan, atau kedaluwarsa tanpa reload halaman. */
+async function refreshSilently(): Promise<void> {
+  if (!order.value || order.value.status !== 'PENDING') {
+    return
+  }
+
+  const loaded = await orderService.getById(order.value.id)
+
+  if (loaded.status === 'PAID' || loaded.status === 'COMPLETED') {
+    await router.replace({ name: 'ticket', params: { orderId: loaded.id } })
+    return
+  }
+
+  order.value = loaded
+}
+
+const { lastUpdated } = useAutoRefresh(refreshSilently, {
+  interval: 10_000,
+  enabled: () => !loading.value && order.value?.status === 'PENDING',
+})
 
 async function pay(): Promise<void> {
   if (paying.value || !order.value || isExpired.value) {
@@ -110,7 +137,7 @@ async function cancel(): Promise<void> {
 
 watch(countdown, (value) => {
   if (value === 0 && order.value?.status === 'PENDING') {
-    void load()
+    void refreshSilently()
   }
 })
 
@@ -133,14 +160,18 @@ onBeforeUnmount(() => {
   <div class="mx-auto max-w-4xl">
     <RouterLink
       to="/orders"
-      class="inline-flex items-center gap-2 text-sm font-semibold text-stone-500 transition hover:text-brand-700"
+      class="inline-flex items-center gap-2 text-sm font-semibold text-ink-600 transition hover:text-ink-950"
     >
       <span aria-hidden="true">←</span> Kembali ke pesanan
     </RouterLink>
 
+    <div v-if="order?.status === 'PENDING'" class="mt-4">
+      <LiveBadge :updated-at="lastUpdated" label="Status otomatis" />
+    </div>
+
     <div v-if="loading" class="mt-6 space-y-5">
-      <div class="h-44 animate-pulse rounded-[2rem] bg-stone-200" />
-      <div class="h-80 animate-pulse rounded-3xl bg-stone-200" />
+      <div class="h-52 animate-pulse rounded-[2rem] bg-sage-200" />
+      <div class="h-80 animate-pulse rounded-[2rem] bg-sage-200" />
     </div>
 
     <div v-else-if="loadError || !order" class="mt-6">
@@ -149,7 +180,7 @@ onBeforeUnmount(() => {
         <template #action>
           <RouterLink
             to="/orders"
-            class="inline-flex items-center justify-center rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800"
+            class="inline-flex min-h-11 items-center justify-center rounded-full bg-ink-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink-800"
           >
             Lihat pesanan saya
           </RouterLink>
@@ -171,13 +202,13 @@ onBeforeUnmount(() => {
           <div class="flex flex-col gap-2 sm:flex-row">
             <RouterLink
               to="/catalog"
-              class="inline-flex items-center justify-center rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800"
+              class="inline-flex min-h-11 items-center justify-center rounded-full bg-ink-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink-800"
             >
               Cari Surprise Bag
             </RouterLink>
             <RouterLink
               to="/orders"
-              class="inline-flex items-center justify-center rounded-full border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+              class="inline-flex min-h-11 items-center justify-center rounded-full border border-ink-900/15 bg-white px-5 py-2.5 text-sm font-semibold text-ink-800 transition hover:bg-sage-100"
             >
               Lihat semua pesanan
             </RouterLink>
@@ -187,116 +218,150 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else>
-      <header class="relative mt-6 overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 px-6 py-7 text-white sm:px-8">
-        <div class="absolute -right-10 -top-14 h-52 w-52 rounded-full border-[20px] border-white/10" />
-        <div class="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div class="flex flex-wrap items-center gap-2">
-              <StatusBadge :status="order.status" />
-              <span class="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold">
-                Order {{ order.id.slice(0, 8).toUpperCase() }}
-              </span>
-            </div>
-            <h1 class="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">Selesaikan pembayaran</h1>
-            <p class="mt-2 max-w-lg text-sm leading-relaxed text-amber-50">
-              Ini pembayaran sandbox. Tidak ada uang sungguhan yang dipotong, tetapi stok tetap dikunci sampai batas waktu.
-            </p>
-          </div>
+      <div class="mt-6">
+        <PageHero
+          :image="storeImage(order.store.storeName)"
+          eyebrow="Pembayaran sandbox"
+          title="Selesaikan pembayaran"
+          description="Ini pembayaran sandbox. Tidak ada uang sungguhan yang dipotong, tetapi stok tetap dikunci sampai batas waktu."
+        >
+          <template #badges>
+            <StatusBadge :status="order.status" />
+            <span
+              class="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur"
+            >
+              Order {{ order.id.slice(0, 8).toUpperCase() }}
+            </span>
+          </template>
 
-          <div class="rounded-2xl bg-white/15 px-5 py-4 backdrop-blur">
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100">Sisa waktu bayar</p>
-            <p class="mt-1 font-mono text-3xl font-extrabold tabular-nums">{{ formatCountdown(countdown) }}</p>
-          </div>
-        </div>
-      </header>
+          <template #aside>
+            <div class="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-sage-200">
+                Sisa waktu bayar
+              </p>
+              <p class="mt-1 font-mono text-3xl font-extrabold tabular-nums text-white">
+                {{ formatCountdown(countdown) }}
+              </p>
+            </div>
+          </template>
+        </PageHero>
+      </div>
 
       <div class="mt-6 grid gap-5 lg:grid-cols-[1fr_19rem]">
-        <section class="card p-5 sm:p-6">
+        <section v-reveal class="rounded-[2rem] border border-ink-900/10 bg-white p-6 shadow-card sm:p-8">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Metode pembayaran</p>
-              <h2 class="mt-2 text-lg font-extrabold text-stone-900">QRIS sandbox</h2>
-              <p class="mt-1 text-sm text-stone-500">Simulasi pembayaran instan tanpa gateway.</p>
+              <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-brand-700">
+                Metode pembayaran
+              </p>
+              <h2 class="mt-2 text-lg font-extrabold tracking-tight text-ink-950">QRIS sandbox</h2>
+              <p class="mt-1 text-sm text-ink-600">Simulasi pembayaran instan tanpa gateway.</p>
             </div>
-            <span class="rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold text-brand-800">Aktif</span>
+            <span class="rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold text-brand-800">
+              Aktif
+            </span>
           </div>
 
-          <div class="mt-5 flex flex-col items-center gap-5 rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-5 py-7 sm:flex-row sm:items-center sm:justify-between">
-            <div class="grid grid-cols-7 gap-1 rounded-xl bg-white p-3 shadow-sm" aria-hidden="true">
+          <div
+            class="mt-5 flex flex-col items-center gap-5 rounded-2xl border border-dashed border-ink-900/15 bg-sage-100/70 px-5 py-7 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div
+              class="grid grid-cols-7 gap-1 rounded-xl border border-ink-900/10 bg-white p-3 shadow-sm"
+              aria-hidden="true"
+            >
               <span
                 v-for="(cell, index) in qrPattern"
                 :key="index"
                 class="h-3 w-3 rounded-[2px]"
-                :class="cell ? 'bg-stone-900' : 'bg-transparent'"
+                :class="cell ? 'bg-ink-900' : 'bg-transparent'"
               />
             </div>
             <div class="text-center sm:text-right">
-              <p class="text-xs font-semibold uppercase tracking-wide text-stone-400">Total bayar</p>
-              <p class="mt-1 text-3xl font-extrabold tracking-tight text-brand-800">{{ formatRupiah(order.totalPrice) }}</p>
-              <p class="mt-1 text-xs text-stone-500">{{ order.qty }} kantong · {{ tierLabels[order.tier.name] }}</p>
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-600">Total bayar</p>
+              <p class="mt-1 text-3xl font-extrabold tracking-tight text-ink-950">
+                {{ formatRupiah(order.totalPrice) }}
+              </p>
+              <p class="mt-1 text-xs text-ink-600">
+                {{ order.qty }} kantong · {{ tierLabels[order.tier.name] }}
+              </p>
             </div>
           </div>
 
-          <div v-if="isExpired" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700">
-            Waktu pembayaran sudah habis. Muat ulang halaman untuk melihat status terbaru.
+          <div
+            v-if="isExpired"
+            class="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700"
+            role="alert"
+          >
+            Waktu pembayaran sudah habis. Status pesanan diperbarui otomatis oleh sistem.
           </div>
-          <div v-else-if="payError" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700">
+          <div
+            v-else-if="payError"
+            class="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700"
+            role="alert"
+          >
             {{ payError }}
           </div>
 
           <div class="mt-5 flex flex-col gap-2 sm:flex-row">
-            <button
+            <AppButton
               type="button"
-              class="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="ink"
+              size="lg"
+              class="flex-1"
+              :loading="paying"
               :disabled="paying || cancelling || isExpired"
               @click="pay"
             >
-              <span
-                v-if="paying"
-                class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                aria-hidden="true"
-              />
               {{ paying ? 'Memproses pembayaran...' : 'Bayar sekarang (sandbox)' }}
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
-              class="inline-flex items-center justify-center rounded-full border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-600 transition hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="secondary"
+              size="lg"
+              :loading="cancelling"
               :disabled="paying || cancelling"
               @click="cancel"
             >
               {{ cancelling ? 'Membatalkan...' : 'Batalkan' }}
-            </button>
+            </AppButton>
           </div>
         </section>
 
         <aside class="lg:sticky lg:top-24 lg:self-start">
-          <section class="card overflow-hidden">
-            <div class="border-b border-stone-100 px-5 py-4">
-              <h2 class="text-sm font-extrabold text-stone-900">Detail pesanan</h2>
+          <section
+            v-reveal="{ delay: 60 }"
+            class="overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white shadow-card"
+          >
+            <div class="border-b border-ink-900/10 px-5 py-4">
+              <h2 class="text-sm font-extrabold tracking-tight text-ink-950">Detail pesanan</h2>
             </div>
-            <dl class="space-y-3 px-5 py-4 text-sm">
+            <div class="space-y-3 px-5 py-4 text-sm">
               <div>
-                <dt class="text-[10px] font-bold uppercase tracking-wide text-stone-400">Toko</dt>
-                <dd class="mt-0.5 font-semibold text-stone-800">{{ order.store.storeName }}</dd>
-                <dd class="mt-0.5 text-xs leading-relaxed text-stone-500">{{ order.store.address }}</dd>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">Toko</p>
+                <p class="mt-0.5 font-semibold text-ink-950">{{ order.store.storeName }}</p>
+                <p class="mt-0.5 text-xs leading-relaxed text-ink-500">{{ order.store.address }}</p>
               </div>
               <div v-if="order.schedule">
-                <dt class="text-[10px] font-bold uppercase tracking-wide text-stone-400">Jadwal pickup</dt>
-                <dd class="mt-0.5 font-semibold text-stone-800">
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
+                  Jadwal pickup
+                </p>
+                <p class="mt-0.5 font-semibold text-ink-950">
                   {{ formatTimeRange(order.schedule.pickupStart, order.schedule.pickupEnd) }}
-                </dd>
+                </p>
               </div>
-              <div class="border-t border-dashed border-stone-200 pt-3">
+              <div class="border-t border-dashed border-ink-900/15 pt-3">
                 <div class="flex items-center justify-between gap-3">
-                  <dt class="text-stone-500">{{ tierLabels[order.tier.name] }} × {{ order.qty }}</dt>
-                  <dd class="font-semibold text-stone-800">{{ formatRupiah(order.totalPrice) }}</dd>
+                  <p class="text-ink-500">{{ tierLabels[order.tier.name] }} × {{ order.qty }}</p>
+                  <p class="font-semibold text-ink-900">{{ formatRupiah(order.totalPrice) }}</p>
                 </div>
                 <div class="mt-2 flex items-center justify-between gap-3">
-                  <dt class="font-bold text-stone-900">Total</dt>
-                  <dd class="text-lg font-extrabold text-brand-800">{{ formatRupiah(order.totalPrice) }}</dd>
+                  <p class="font-bold text-ink-950">Total</p>
+                  <p class="text-lg font-extrabold tracking-tight text-ink-950">
+                    {{ formatRupiah(order.totalPrice) }}
+                  </p>
                 </div>
               </div>
-            </dl>
+            </div>
           </section>
         </aside>
       </div>

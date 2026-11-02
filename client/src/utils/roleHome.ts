@@ -9,5 +9,5 @@ export function homePathForRole(role: Role | null | undefined): string {
     return '/merchant'
   }
 
-  return '/orders'
+  return '/'
 }

@@ -14,13 +14,17 @@ Sudah tersedia:
 - Prisma schema lengkap untuk `User`, `Store`, `StoreSchedule`, `Tier`, `Order`, dan `OrderAudit`.
 - Seed data 8 toko di Malang, 3 tier per toko, akun demo customer/merchant/admin.
 - API `GET /api/health`, `GET /api/stores`, dan `GET /api/stores/:id`.
-- Halaman beranda, katalog dengan peta Leaflet, dan detail toko + tier.
+- Home editorial customer-first: hero foto full-bleed, ringkasan Savora, tiga stats, kartu fitur, tiga kartu tier (Hemat, Reguler, Besar) dengan nilai asli minimum, dan section cara kerja berlatar putih.
+- Katalog dengan peta Leaflet dan detail toko + tier.
 - Auth JWT: register customer, login semua role, dan `GET /api/auth/me`.
 - Registrasi publik hanya untuk customer; field `role` ditolak di level validasi.
 - Panel admin di `/admin` untuk melihat daftar mitra, statistik toko, pencarian, dan membuat akun mitra + toko sekaligus.
 - Akun mitra dan toko hanya dapat dibuat admin. Toko baru langsung `ACTIVE`, memiliki 3 tier dengan stok 0, dan jadwal pickup harian.
 - Halaman login/register yang sudah terhubung ke API dan menyimpan sesi di Pinia.
-- Redirect setelah login sesuai role: customer → `/orders`, mitra → `/merchant`, admin → `/admin`.
+- Navigasi publik hanya **Home** dan **Katalog**. Akses **Pesanan saya** berada di menu akun untuk customer yang login.
+- Pencarian di halaman katalog memfilter toko berdasarkan nama atau alamat dan tersinkron dengan `?q=` di URL.
+- Redirect setelah login sesuai role: customer → `/`, mitra → `/merchant`, admin → `/admin`.
+- Menu akun dan menu mobile bisa ditutup dengan Escape, klik luar, atau perpindahan route.
 - Layout dan dasbor mitra di `/merchant`: rekap harian, pesanan terbaru, kelola stok tiga tier, jadwal pickup, dan terminal verifikasi PIN.
 - Verifikasi PIN hanya menerima order `PAID` milik toko mitra yang masih dalam jendela pickup, lalu mengubah status menjadi `COMPLETED`.
 - Alur order customer: checkout, reservasi stok atomik, batas 2 kantong per toko per hari, pembayaran sandbox, PIN 4 digit, tiket pickup, dan riwayat pesanan.
@@ -29,6 +33,8 @@ Sudah tersedia:
 - Panel monitoring admin di `/admin/monitoring`: statistik harian, daftar toko WARNING/SUSPENDED beserta rasio ulasan, transaksi terbaru, serta aksi pulihkan/suspend.
 - Katalog publik menyaring toko yang tutup: hanya toko `ACTIVE`/`WARNING` yang punya stok dan jadwal pickup hari ini yang belum lewat.
 - Cron `node-cron` menandai `PENDING` yang lewat batas bayar sebagai `EXPIRED` (stok dikembalikan) dan `PAID` yang lewat jadwal pickup sebagai `EXPIRED` (tanpa refund).
+- Pembaruan otomatis tanpa reload: katalog, detail toko, checkout, pesanan, pembayaran, dan tiket menyegarkan data di latar belakang (interval + saat tab kembali aktif), sehingga stok dan status pesanan berubah sendiri di layar.
+- Animasi scroll reveal halus di halaman customer lewat directive `v-reveal`; elemen di atas fold dan area hero tetap tampil instan, dan animasi dimatikan saat `prefers-reduced-motion`.
 - Build produksi dan typecheck bebas error.
 
 Belum diimplementasikan (di luar cakupan MVP):
@@ -56,7 +62,7 @@ Belum diimplementasikan (di luar cakupan MVP):
 Savora/
 ├─ client/
 │  └─ src/
-│     ├─ components/      # common, store, order
+│     ├─ components/      # common, home, layout, store, order
 │     ├─ layouts/         # PublicLayout, CustomerLayout, MerchantLayout, AdminLayout
 │     ├─ router/          # route + guard role
 │     ├─ services/        # axios + service per domain
@@ -143,6 +149,19 @@ Seed juga membuat merchant2–merchant8 untuk toko lainnya.
 
 Registrasi publik di `/auth/register` hanya membuat akun **customer**. Akun mitra dibuat admin dari panel `/admin`; setelah itu mitra masuk lewat halaman login yang sama. Jangan mendaftarkan email mitra lewat form publik.
 
+Halaman login dan register publik memakai panel editorial yang sama dengan Home: satu kolom foto gelap dengan wordmark **Savora**, dan satu kolom form putih dengan eyebrow hijau, input membulat, serta tombol utama pill gelap. Halaman login menyediakan tombol **Gunakan akun demo**. Kredensial mitra dan admin tetap ada di tabel ini untuk kebutuhan pengujian, tetapi tidak lagi ditampilkan di halaman user.
+
+## Alur Halaman User
+
+1. Pengunjung membuka `/` dan langsung melihat Home bergaya editorial: hero foto dengan kata **SAVORA**, ringkasan Savora, tiga stats, kartu fitur, tiga kartu tier (Hemat, Reguler, Besar), dan section **Cara kerja** berlatar putih.
+2. Navigasi utama hanya **Home** dan **Katalog**.
+3. Customer memilih **Daftar** atau **Masuk**. Setelah berhasil, customer diarahkan ke Home. Merchant dan admin tetap diarahkan ke dasbor masing-masing.
+4. Customer membuka **Pesanan saya** lewat menu akun di kanan atas. Menu yang sama berisi **Keluar**.
+5. Di layar kecil, menu hamburger memuat Home, Katalog, dan aksi akun.
+6. Logout dari halaman mana pun kembali ke Home.
+7. Hero menampilkan jumlah kantong dan toko hari ini dari `GET /api/stores`, dengan state memuat dan state stok kosong. Tidak ada stok, PIN, atau nama toko yang di-hardcode.
+8. Daftar toko lengkap ada di halaman Katalog, bukan di Home.
+
 ## Alur Onboarding Mitra
 
 1. Admin masuk ke `/admin` lalu memilih **Tambah mitra**.
@@ -165,7 +184,7 @@ Registrasi publik di `/auth/register` hanya membuat akun **customer**. Akun mitr
 ## Alur Operasional Mitra
 
 1. Mitra masuk dan diarahkan ke `/merchant`.
-2. Dasbor menampilkan pendapatan hari ini, pesanan selesai, tiket yang menunggu pickup, total stok, dan 10 pesanan terbaru.
+2. Dasbor menampilkan header foto toko, pendapatan hari ini, pesanan selesai, tiket yang menunggu pickup, total stok, dan 10 pesanan terbaru.
 3. Halaman **Stok** memungkinkan mitra mengubah stok tiap tier. Harga tier tetap mengikuti aturan PRD.
 4. Halaman **Stok** juga mengatur jendela pickup harian. Perubahan langsung memengaruhi katalog publik.
 5. Halaman **Verifikasi** menyediakan keypad PIN 4 digit. Sistem mencocokkan PIN dengan order `PAID` milik toko, memastikan masih dalam jam pickup, lalu mengubah status menjadi `COMPLETED`.
@@ -244,11 +263,24 @@ Registrasi publik di `/auth/register` hanya membuat akun **customer**. Akun mitr
 - **Verifikasi mitra:** PIN dicari hanya di toko milik mitra yang login; order harus `PAID`, belum lewat `expiresAt`, dan sudah masuk jam pickup. Verifikasi mengubah status menjadi `COMPLETED` dan PIN tidak bisa dipakai ulang.
 - **Rekap mitra:** pendapatan hari ini dihitung dari order `COMPLETED` yang diperbarui hari ini; tiket aktif dihitung dari order `PAID` yang belum lewat batas pickup.
 - **Stok mitra:** perubahan stok langsung memengaruhi katalog. Toko dengan total stok 0 otomatis hilang dari katalog sampai stok diisi kembali.
-- **Map:** Leaflet memakai tile OpenStreetMap, jadi tidak memerlukan API key.
+- **Halaman user:** `/` adalah Home publik bergaya editorial dengan hero foto, ringkasan Savora, kartu fitur, tiga kartu tier, dan section cara kerja. Navigasi utama hanya Home dan Katalog; Pesanan saya berada di menu akun.
+- **Auth:** halaman login dan register memakai panel `rounded-[2rem]` dua kolom. Kolom kiri berisi foto toko dengan overlay `ink-950`, wordmark Savora, dan daftar keunggulan; kolom kanan berisi form putih dengan eyebrow `brand-700`, label kapital 11px, input `rounded-2xl` berfokus brand, serta tombol pill `ink-900`. Di bawah 1024 px panel bertumpuk dengan banner foto ringkas.
+- **Data Home:** badge hero menghitung jumlah kantong dan toko hari ini dari `GET /api/stores`, lengkap dengan state memuat dan state stok kosong. Tidak ada angka stok atau PIN contoh yang di-hardcode.
+- **Cara kerja:** section berlatar putih dengan garis pemisah di atas langkah. Tiap langkah memakai tile ikon sage dengan badge nomor di sudutnya, judul ink, dan deskripsi. Di layar ≥1024 px langkah tersusun tiga kolom dengan garis putus-putus yang menyambung tepat di tengah ikon; di bawahnya langkah bertumpuk dengan rel vertikal di sisi kiri. Eyebrow section memakai `brand-700` yang sama dengan section lain, tanpa aksen amber.
+- **Tier:** tiga kartu Hemat, Reguler, dan Besar menampilkan harga tetap Rp15.000 / Rp25.000 / Rp35.000 beserta nilai asli minimum dari PRD. Kartu Reguler diberi garis putih tipis dan posisi lebih tinggi di layar lebar; di bawah 1024 px ketiganya bertumpuk penuh.
+- **Pencarian:** halaman katalog menyinkronkan input dengan `?q=` lewat `router.replace`, lalu memfilter nama serta alamat toko.
+- **Alur customer:** halaman toko, checkout, pembayaran, tiket, pesanan, dan ulasan memakai header foto gelap `PageHero` dengan eyebrow `brand-300`, panel putih `rounded-[2rem]` ber-`shadow-card`, tombol pill `ink-900`, dan status badge bernada sage/brand. Aksen amber dihapus dari seluruh alur customer; keadaan negatif memakai merah lembut dan keadaan netral memakai sage.
+- **Area mitra:** dasbor, stok & jadwal, dan terminal verifikasi PIN memakai bahasa visual yang sama dengan alur customer — latar `sage-100`, header foto toko `PageHero`, panel putih `rounded-[2rem]`, nav pill aktif `ink-900`, keypad PIN editorial, serta status badge sage/brand. Aksen amber dan stone dihapus dari area mitra; error memakai merah lembut dan tips memakai sage.
+- **Foto:** hero, kartu tier, dan kartu toko di katalog memakai foto Unsplash yang disimpan lokal di `client/public/images` dan dioptimalkan ke WebP. Foto bersifat ilustrasi, bukan dokumentasi toko asli.
+- **Map:** Leaflet memakai tile OpenStreetMap, jadi tidak memerlukan API key. Tile layer mengaktifkan `detectRetina` agar peta tetap tajam di layar berdensitas tinggi.
 
 ## Roadmap
 
 1. **Fase 1 (selesai):** auth JWT, onboarding admin→mitra, order + reservasi stok, mock payment, PIN, tiket, cron expiry.
 2. **Fase 2 (selesai):** operasional mitra — kelola stok/tier/jadwal, terminal verifikasi PIN, rekap harian.
 3. **Fase 3 (selesai):** ulasan biner customer, red flag otomatis >20%, monitoring dan aksi status toko di panel admin.
-4. **Fase 4 (berikutnya):** deploy frontend Vercel, backend Render, database Neon/Supabase, lalu hardening produksi.
+4. **Fase 4 (selesai):** penyederhanaan halaman user: Home customer-first, navigasi Home + Katalog, menu akun, dan penghapusan promosi mitra dari area publik.
+5. **Fase 5 (selesai):** redesign editorial Home dan header/footer: hero foto, palet sage-ink, kartu tier, section cara kerja, pencarian katalog, serta komponen kartu dan langkah.
+6. **Fase 6 (selesai):** penyamaan desain seluruh alur customer (toko, checkout, pembayaran, tiket, pesanan, ulasan) dengan bahasa visual Home, termasuk header foto bersama dan penghapusan aksen amber.
+7. **Fase 7 (selesai):** penyamaan desain area mitra (dasbor, stok & jadwal, terminal verifikasi PIN) dengan bahasa visual Home dan alur customer, termasuk penghapusan aksen amber/stone.
+8. **Fase 8 (berikutnya):** deploy frontend Vercel, backend Render, database Neon/Supabase, lalu hardening produksi.

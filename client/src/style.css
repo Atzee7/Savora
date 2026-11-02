@@ -5,20 +5,33 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
   }
 
   body {
-    @apply bg-stone-50 font-sans text-stone-800 antialiased;
+    @apply bg-sage-100 font-sans text-ink-800 antialiased;
   }
 
   ::selection {
     @apply bg-brand-200 text-brand-950;
   }
+
+  :where(a[href], button, [role='button'], summary, select, label[for]) {
+    @apply cursor-pointer;
+  }
+
+  :where(button:disabled, [aria-disabled='true']) {
+    @apply cursor-not-allowed;
+  }
+
+  :where(a[href], button, [role='button'], summary, select):focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand-600;
+  }
 }
 
 @layer components {
   .container-page {
-    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+    @apply mx-auto w-full max-w-[1200px] px-5 sm:px-8 lg:px-10;
   }
 
   .card {
@@ -26,14 +39,65 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-stone-100;
+    @apply w-full rounded-2xl border border-ink-900/15 bg-white px-4 py-3 text-sm text-ink-950 outline-none transition placeholder:text-ink-500 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-sage-100;
   }
 
   .label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-stone-500;
+    @apply mb-1.5 block text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-600;
   }
 
   .link-muted {
     @apply text-sm font-semibold text-stone-500 transition hover:text-brand-700;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scroll reveal. Class `reveal` hanya ditambahkan oleh directive `v-reveal`. */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media print {
+  .reveal {
+    opacity: 1;
+    transform: none;
   }
 }

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+    variant?: 'primary' | 'ink' | 'secondary' | 'ghost' | 'danger'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -21,9 +21,10 @@ const props = withDefaults(
 const variantClasses: Record<string, string> = {
   primary:
     'bg-brand-700 text-white shadow-sm hover:bg-brand-800 focus-visible:ring-brand-500 disabled:hover:bg-brand-700',
+  ink: 'bg-ink-900 text-white shadow-sm hover:bg-ink-800 focus-visible:ring-ink-900 disabled:hover:bg-ink-900',
   secondary:
-    'border border-stone-300 bg-white text-stone-700 hover:border-brand-300 hover:text-brand-700 focus-visible:ring-brand-500',
-  ghost: 'text-stone-600 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500',
+    'border border-ink-900/15 bg-white text-ink-800 hover:border-ink-900/30 hover:bg-sage-100 focus-visible:ring-ink-900',
+  ghost: 'text-ink-600 hover:bg-sage-100 hover:text-ink-900 focus-visible:ring-ink-900',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
 }
 

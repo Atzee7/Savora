@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 
+import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import PageHero from '@/components/common/PageHero.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
 import { merchantService } from '@/services/merchant.service'
 import type { Store, Tier, TierName } from '@/types'
 import { getErrorMessage } from '@/utils/error'
 import { formatRupiah, formatTimeRange } from '@/utils/format'
+import { storeImage } from '@/utils/storeImage'
 
 const store = ref<Store | null>(null)
 const loading = ref(true)
@@ -21,11 +25,25 @@ const savingSchedule = ref(false)
 const scheduleError = ref('')
 const scheduleSuccess = ref('')
 
-const tierMeta: Record<TierName, { label: string; description: string; emoji: string }> = {
-  HEMAT: { label: 'Tier Hemat', description: 'Camilan atau makan ringan.', emoji: '🥯' },
-  REGULER: { label: 'Tier Reguler', description: 'Porsi seimbang untuk makan kenyang.', emoji: '🥐' },
-  BESAR: { label: 'Tier Besar', description: 'Isi lebih banyak, cocok dibagi.', emoji: '🥖' },
+const tierMeta: Record<TierName, { label: string; description: string; image: string }> = {
+  HEMAT: {
+    label: 'Tier Hemat',
+    description: 'Camilan atau makan ringan untuk satu orang.',
+    image: '/images/store-bakery.webp',
+  },
+  REGULER: {
+    label: 'Tier Reguler',
+    description: 'Porsi seimbang untuk makan kenyang.',
+    image: '/images/tier-reguler.webp',
+  },
+  BESAR: {
+    label: 'Tier Besar',
+    description: 'Isi lebih banyak, cocok dibagi atau disimpan.',
+    image: '/images/tier-besar.webp',
+  },
 }
+
+const schedule = computed(() => store.value?.schedules[0] ?? null)
 
 const totalDraft = computed(() => {
   if (!store.value) {
@@ -40,10 +58,10 @@ function syncForm(loaded: Store): void {
     stockDraft[tier.id] = tier.stock
   }
 
-  const schedule = loaded.schedules[0]
-  if (schedule) {
-    scheduleForm.pickupStart = schedule.pickupStart
-    scheduleForm.pickupEnd = schedule.pickupEnd
+  const currentSchedule = loaded.schedules[0]
+  if (currentSchedule) {
+    scheduleForm.pickupStart = currentSchedule.pickupStart
+    scheduleForm.pickupEnd = currentSchedule.pickupEnd
   }
 }
 
@@ -141,66 +159,98 @@ onMounted(() => {
 
 <template>
   <div>
-    <header>
-      <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-        Dasbor mitra / Stok &amp; jadwal
-      </p>
-      <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
-        Kelola stok &amp; jadwal pickup
-      </h1>
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500">
-        Stok dan jam pickup menentukan apakah toko tampil di katalog publik. Toko otomatis disembunyikan saat total stok 0 atau jam pickup hari ini sudah lewat.
-      </p>
-    </header>
+    <RouterLink
+      to="/merchant"
+      class="inline-flex items-center gap-2 text-sm font-semibold text-ink-600 transition hover:text-ink-950"
+    >
+      <span aria-hidden="true">←</span> Kembali ke dasbor
+    </RouterLink>
 
-    <div v-if="loading" class="mt-6 space-y-4">
-      <div class="h-36 animate-pulse rounded-2xl bg-stone-200" />
-      <div class="h-72 animate-pulse rounded-2xl bg-stone-200" />
+    <div v-if="loading" class="mt-6 space-y-5">
+      <div class="h-56 animate-pulse rounded-[2rem] bg-sage-200" />
+      <div class="grid gap-5 lg:grid-cols-[1fr_20rem]">
+        <div class="h-80 animate-pulse rounded-[2rem] bg-sage-200" />
+        <div class="h-80 animate-pulse rounded-[2rem] bg-sage-200" />
+      </div>
     </div>
 
     <div v-else-if="loadError || !store" class="mt-6">
       <EmptyState title="Data toko belum bisa dimuat" :description="loadError">
         <template #icon>📦</template>
         <template #action>
-          <button
-            type="button"
-            class="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800"
-            @click="load"
-          >
-            Coba lagi
-          </button>
+          <AppButton variant="ink" @click="load">Coba lagi</AppButton>
         </template>
       </EmptyState>
     </div>
 
     <template v-else>
-      <section class="mt-6 flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-stone-400">Ringkasan stok</p>
-          <p class="mt-1 text-sm text-stone-600">
-            <strong class="text-stone-900">{{ totalDraft }} kantong</strong> tersimpan di draft.
-            Tersedia saat ini: <strong class="text-stone-900">{{ store.totalStock }}</strong>.
-          </p>
-        </div>
-        <RouterLink
-          to="/merchant"
-          class="text-xs font-bold text-brand-700 hover:underline"
+      <div class="mt-6">
+        <PageHero
+          :image="storeImage(store.storeName)"
+          eyebrow="Mitra / Inventori"
+          title="Kelola stok & jadwal"
+          description="Stok dan jam pickup menentukan apakah toko tampil di katalog publik. Toko otomatis disembunyikan saat total stok 0 atau jam pickup hari ini sudah lewat."
         >
-          ← Kembali ke dasbor
-        </RouterLink>
-      </section>
+          <template #badges>
+            <StatusBadge :status="store.status" />
+            <span
+              class="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur"
+            >
+              Draft {{ totalDraft }} kantong
+            </span>
+          </template>
 
-      <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_20rem]">
+          <template #aside>
+            <div class="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-sage-200">
+                Jendela pickup
+              </p>
+              <p class="mt-1 text-lg font-extrabold text-white">
+                {{
+                  schedule
+                    ? formatTimeRange(schedule.pickupStart, schedule.pickupEnd)
+                    : 'Belum diatur'
+                }}
+              </p>
+              <p class="mt-0.5 text-[11px] font-semibold text-sage-200">
+                {{ store.totalStock }} kantong tersedia
+              </p>
+            </div>
+          </template>
+
+          <template #meta>
+            <span>{{ store.storeName }}</span>
+            <span class="text-white/30" aria-hidden="true">·</span>
+            <span>Harga tetap sesuai PRD</span>
+            <span class="text-white/30" aria-hidden="true">·</span>
+            <span>Perubahan langsung tampil di katalog</span>
+          </template>
+        </PageHero>
+      </div>
+
+      <div class="mt-6 grid gap-5 lg:grid-cols-[1fr_20rem]">
         <section class="space-y-4">
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-sm font-extrabold uppercase tracking-[0.12em] text-stone-400">Stok per tier</h2>
-            <span class="text-xs text-stone-400">Harga tetap sesuai PRD</span>
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+                Stok per tier
+              </p>
+              <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-ink-950">
+                Tiga kantong, tiga ukuran.
+              </h2>
+            </div>
+            <p class="text-xs text-ink-600">Draft {{ totalDraft }} kantong</p>
           </div>
 
           <div
             v-if="tierError || tierSuccess"
-            class="rounded-lg border px-4 py-3 text-sm"
-            :class="tierError ? 'border-red-200 bg-red-50 text-red-700' : 'border-brand-200 bg-brand-50 text-brand-900'"
+            class="rounded-2xl border px-4 py-3 text-sm leading-relaxed"
+            :class="
+              tierError
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : 'border-brand-200 bg-brand-50 text-brand-800'
+            "
+            role="status"
           >
             {{ tierError || tierSuccess }}
           </div>
@@ -208,27 +258,51 @@ onMounted(() => {
           <article
             v-for="tier in store.tiers"
             :key="tier.id"
-            class="rounded-2xl border border-stone-200 bg-white p-5"
+            class="overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white shadow-card"
           >
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex items-start gap-3">
-                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-xl">
-                  {{ tierMeta[tier.name].emoji }}
-                </span>
-                <div>
-                  <p class="font-extrabold text-stone-900">{{ tierMeta[tier.name].label }}</p>
-                  <p class="mt-0.5 text-xs text-stone-500">{{ tierMeta[tier.name].description }}</p>
-                  <p class="mt-1 text-xs font-semibold text-stone-600">
-                    {{ formatRupiah(tier.price) }} · senilai min. {{ formatRupiah(tier.minOriginalValue) }}
+            <div
+              class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            >
+              <div class="flex min-w-0 items-start gap-4">
+                <img
+                  :src="tierMeta[tier.name].image"
+                  :alt="`Ilustrasi ${tierMeta[tier.name].label}`"
+                  loading="lazy"
+                  class="h-16 w-16 shrink-0 rounded-2xl object-cover"
+                />
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-base font-extrabold tracking-tight text-ink-950">
+                      {{ tierMeta[tier.name].label }}
+                    </h3>
+                    <span
+                      class="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                      :class="
+                        tier.stock > 0
+                          ? 'bg-brand-100 text-brand-800'
+                          : 'bg-red-50 text-red-700'
+                      "
+                    >
+                      {{ tier.stock > 0 ? `${tier.stock} tersedia` : 'Stok habis' }}
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm leading-relaxed text-ink-600">
+                    {{ tierMeta[tier.name].description }}
+                  </p>
+                  <p class="mt-1 text-xs font-semibold text-ink-500">
+                    {{ formatRupiah(tier.price) }} · senilai min.
+                    {{ formatRupiah(tier.minOriginalValue) }}
                   </p>
                 </div>
               </div>
 
               <div class="flex flex-wrap items-center gap-3">
-                <div class="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white p-1">
+                <div
+                  class="inline-flex items-center gap-1 rounded-full border border-ink-900/15 bg-white p-1"
+                >
                   <button
                     type="button"
-                    class="grid h-8 w-8 place-items-center rounded-full text-lg font-bold text-stone-600 transition hover:bg-stone-100 disabled:opacity-40"
+                    class="grid h-9 w-9 place-items-center rounded-full text-lg font-bold text-ink-700 transition hover:bg-sage-100 disabled:cursor-not-allowed disabled:opacity-40"
                     :disabled="(stockDraft[tier.id] ?? 0) <= 0"
                     aria-label="Kurangi stok"
                     @click="changeStock(tier, -1)"
@@ -240,12 +314,12 @@ onMounted(() => {
                     type="number"
                     min="0"
                     max="1000"
-                    class="w-14 border-0 bg-transparent text-center font-mono text-sm font-extrabold text-stone-900 outline-none"
+                    class="w-14 border-0 bg-transparent text-center font-mono text-sm font-extrabold text-ink-950 outline-none"
                     :aria-label="`Stok ${tierMeta[tier.name].label}`"
                   />
                   <button
                     type="button"
-                    class="grid h-8 w-8 place-items-center rounded-full text-lg font-bold text-stone-600 transition hover:bg-stone-100 disabled:opacity-40"
+                    class="grid h-9 w-9 place-items-center rounded-full text-lg font-bold text-ink-700 transition hover:bg-sage-100 disabled:cursor-not-allowed disabled:opacity-40"
                     :disabled="(stockDraft[tier.id] ?? 0) >= 1000"
                     aria-label="Tambah stok"
                     @click="changeStock(tier, 1)"
@@ -256,11 +330,11 @@ onMounted(() => {
 
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition"
+                  class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition"
                   :class="
                     isDirty(tier)
-                      ? 'bg-brand-700 text-white hover:bg-brand-800'
-                      : 'cursor-not-allowed bg-stone-100 text-stone-400'
+                      ? 'bg-ink-900 text-white hover:bg-ink-800'
+                      : 'cursor-not-allowed bg-sage-200 text-ink-500'
                   "
                   :disabled="!isDirty(tier) || savingTierId === tier.id"
                   @click="saveStock(tier)"
@@ -275,20 +349,32 @@ onMounted(() => {
               </div>
             </div>
 
-            <p class="mt-3 text-[11px] text-stone-400">
-              Stok tersedia saat ini: <strong class="text-stone-600">{{ tier.stock }}</strong> kantong.
-            </p>
+            <div
+              class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-900/10 bg-sage-50 px-5 py-3 sm:px-6"
+            >
+              <p class="text-[11px] text-ink-600">
+                Stok tersimpan:
+                <strong class="text-ink-900">{{ tier.stock }}</strong> kantong.
+              </p>
+              <p v-if="isDirty(tier)" class="text-[11px] font-bold text-brand-700">
+                Ada perubahan belum disimpan
+              </p>
+            </div>
           </article>
         </section>
 
-        <aside class="lg:sticky lg:top-24 lg:self-start">
-          <section class="rounded-2xl border border-stone-200 bg-white p-5">
-            <h2 class="text-sm font-extrabold text-stone-900">Jadwal pickup</h2>
-            <p class="mt-1 text-xs leading-relaxed text-stone-500">
-              Satu jendela pickup berlaku setiap hari. Customer hanya bisa memesan sebelum jam selesai.
+        <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <section class="rounded-[2rem] border border-ink-900/10 bg-white p-6 shadow-card">
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-brand-700">
+              Jam operasional
+            </p>
+            <h2 class="mt-2 text-lg font-extrabold tracking-tight text-ink-950">Jadwal pickup</h2>
+            <p class="mt-1 text-xs leading-relaxed text-ink-600">
+              Satu jendela pickup berlaku setiap hari. Customer hanya bisa memesan sebelum jam
+              selesai.
             </p>
 
-            <div class="mt-4 space-y-3">
+            <div class="mt-5 space-y-3">
               <div>
                 <label for="pickup-start" class="label">Mulai</label>
                 <input id="pickup-start" v-model="scheduleForm.pickupStart" type="time" class="input" />
@@ -299,41 +385,66 @@ onMounted(() => {
               </div>
             </div>
 
-            <p v-if="scheduleSuccess" class="mt-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-900">
+            <p
+              v-if="scheduleSuccess"
+              class="mt-3 rounded-2xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-xs leading-relaxed text-brand-800"
+              role="status"
+            >
               {{ scheduleSuccess }}
             </p>
-            <p v-if="scheduleError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <p
+              v-if="scheduleError"
+              class="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-relaxed text-red-700"
+              role="alert"
+            >
               {{ scheduleError }}
             </p>
 
-            <button
-              type="button"
-              class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+            <AppButton
+              variant="ink"
+              size="md"
+              class="mt-4 w-full"
+              :loading="savingSchedule"
               :disabled="savingSchedule"
               @click="saveSchedule"
             >
-              <span
-                v-if="savingSchedule"
-                class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                aria-hidden="true"
-              />
               {{ savingSchedule ? 'Menyimpan...' : 'Simpan jadwal' }}
-            </button>
+            </AppButton>
 
-            <div class="mt-4 rounded-lg bg-stone-50 px-3 py-3 text-xs leading-relaxed text-stone-500">
-              <p class="font-bold text-stone-700">Jadwal aktif</p>
-              <p class="mt-1">
-                {{ store.schedules[0] ? formatTimeRange(store.schedules[0].pickupStart, store.schedules[0].pickupEnd) : 'Belum diatur' }}
+            <div class="mt-4 rounded-2xl bg-sage-100 px-4 py-3">
+              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-600">
+                Jadwal aktif
+              </p>
+              <p class="mt-1 text-sm font-extrabold text-ink-950">
+                {{
+                  schedule
+                    ? formatTimeRange(schedule.pickupStart, schedule.pickupEnd)
+                    : 'Belum diatur'
+                }}
               </p>
             </div>
           </section>
 
           <div
             v-if="totalDraft === 0"
-            class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800"
+            class="rounded-[2rem] border border-red-200 bg-red-50 p-5 text-xs leading-relaxed text-red-700"
+            role="alert"
           >
-            Total stok 0. Toko belum akan muncul di katalog publik sampai ada stok tersimpan.
+            <p class="font-extrabold">Toko belum tampil di katalog</p>
+            <p class="mt-1">
+              Total stok 0. Isi stok minimal satu tier agar toko muncul lagi di katalog publik.
+            </p>
           </div>
+
+          <section v-else class="rounded-[2rem] border border-ink-900/10 bg-sage-200/70 p-5">
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-brand-800">
+              Tips
+            </p>
+            <p class="mt-2 text-xs leading-relaxed text-ink-700">
+              Simpan stok sebelum jam pickup dimulai. Perubahan stok langsung mengurangi atau
+              menambah kantong yang terlihat customer.
+            </p>
+          </section>
         </aside>
       </div>
     </template>
