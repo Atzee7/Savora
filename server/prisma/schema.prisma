@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  MERCHANT
+  ADMIN
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  WARNING
+  SUSPENDED
+}
+
+enum TierName {
+  HEMAT
+  REGULER
+  BESAR
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(160)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         Role     @default(CUSTOMER)
+  phone        String?  @db.VarChar(30)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  store  Store?
+  orders Order[] @relation("CustomerOrders")
+
+  @@map("users")
+}
+
+model Store {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @unique @map("user_id") @db.Uuid
+  storeName String      @map("store_name") @db.VarChar(160)
+  address   String      @db.Text
+  latitude  Float
+  longitude Float
+  status    StoreStatus @default(PENDING)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedules StoreSchedule[]
+  tiers     Tier[]
+  orders    Order[]
+
+  @@map("stores")
+}
+
+model StoreSchedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  storeId     String   @map("store_id") @db.Uuid
+  dayOfWeek   Int?     @map("day_of_week")
+  pickupStart DateTime @map("pickup_start") @db.Time(0)
+  pickupEnd   DateTime @map("pickup_end") @db.Time(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("store_schedules")
+}
+
+model Tier {
+  id               String   @id @default(uuid()) @db.Uuid
+  storeId          String   @map("store_id") @db.Uuid
+  name             TierName
+  price            Int
+  minOriginalValue Int      @map("min_original_value")
+  stock            Int      @default(0)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([storeId, name])
+  @@map("tiers")
+}
+
+model Order {
+  id         String      @id @default(uuid()) @db.Uuid
+  customerId String      @map("customer_id") @db.Uuid
+  storeId    String      @map("store_id") @db.Uuid
+  tierId     String      @map("tier_id") @db.Uuid
+  qty        Int         @default(1)
+  totalPrice Int         @map("total_price")
+  status     OrderStatus @default(PENDING)
+  pinCode    String?     @map("pin_code") @db.Char(4)
+  expiresAt  DateTime?   @map("expires_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  customer User           @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Cascade)
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  tier     Tier           @relation(fields: [tierId], references: [id], onDelete: Restrict)
+  audit    OrderAudit?
+
+  @@index([customerId, createdAt])
+  @@index([storeId, status])
+  @@index([pinCode, status])
+  @@map("orders")
+}
+
+model OrderAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String   @unique @map("order_id") @db.Uuid
+  isSatisfied Boolean  @map("is_satisfied")
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_audits")
+}
