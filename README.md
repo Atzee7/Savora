@@ -215,6 +215,7 @@ Halaman login dan register publik memakai panel editorial yang sama dengan Home:
 | `npm run typecheck` | Typecheck server dan client |
 | `npm run seed` | Jalankan `prisma db seed` |
 | `npm run db:migrate` | `prisma migrate dev` |
+| `npm run db:deploy` | `prisma migrate deploy` (untuk database cloud) |
 | `npm run db:generate` | Generate Prisma Client |
 | `npm run db:studio` | Buka Prisma Studio |
 
@@ -274,6 +275,63 @@ Halaman login dan register publik memakai panel editorial yang sama dengan Home:
 - **Foto:** hero, kartu tier, dan kartu toko di katalog memakai foto Unsplash yang disimpan lokal di `client/public/images` dan dioptimalkan ke WebP. Foto bersifat ilustrasi, bukan dokumentasi toko asli.
 - **Map:** Leaflet memakai tile OpenStreetMap, jadi tidak memerlukan API key. Tile layer mengaktifkan `detectRetina` agar peta tetap tajam di layar berdensitas tinggi.
 
+## Deploy (Vercel + Supabase)
+
+Satu project Vercel dengan **Services** menyajikan dua aplikasi dalam satu domain:
+
+- `client/` dibangun sebagai situs statis Vite.
+- `server/` dijalankan sebagai layanan Express di `/api/*`.
+
+Database memakai PostgreSQL Supabase. Frontend dan API berbagi domain, jadi `VITE_API_URL` tetap `/api` dan tidak ada preflight CORS.
+
+### 1. Supabase
+
+1. Buat project baru, pilih region terdekat (Singapore).
+2. Buka **Connect** dan salin dua connection string:
+   - **Transaction pooler** (port `6543`) → `DATABASE_URL`, tambahkan `?pgbouncer=true&connection_limit=1&sslmode=require`.
+   - **Session pooler** (port `5432`) → `DIRECT_URL`, tambahkan `?sslmode=require`.
+3. Jangan memakai host `db.<project-ref>.supabase.co` kecuali jaringanmu mendukung IPv6.
+
+### 2. Migrasi dan seed
+
+```bash
+# isi DATABASE_URL + DIRECT_URL di server/.env dengan nilai Supabase
+npm run db:deploy
+npm run seed
+```
+
+`DIRECT_URL` hanya dipakai Prisma untuk migrasi; Prisma Client memakai `DATABASE_URL` yang lewat pooler.
+
+### 3. Environment Vercel
+
+| Variabel | Nilai |
+| :--- | :--- |
+| `DATABASE_URL` | transaction pooler Supabase (port 6543 + `pgbouncer=true`) |
+| `JWT_SECRET` | string acak minimal 32 karakter |
+| `JWT_EXPIRES_IN` | `7d` |
+| `CLIENT_URL` | `https://<project>.vercel.app` |
+| `NODE_ENV` | `production` |
+
+`DIRECT_URL` tidak perlu diisi di Vercel karena migrasi dijalankan dari lokal/CLI. `PORT` diabaikan oleh function.
+
+### 4. Deploy
+
+Import repo ke Vercel tanpa mengubah Root Directory. `vercel.json` memakai model `services`:
+
+| Service | Root | Peran |
+| :--- | :--- | :--- |
+| `web` | `client/` | build Vite, output `dist`, fallback SPA ke `index.html` |
+| `api` | `server/` | Express, entrypoint `dist/app.js` hasil build `tsc` |
+
+Request `/api/*` dirutekan ke service `api`, sisanya ke `web`. Vercel membangun kedua service secara terpisah dalam satu deployment.
+
+### Catatan produksi
+
+- **Cron:** `node-cron` tidak berjalan di serverless. Saat `process.env.VERCEL` terisi, `server/src/app.ts` memanggil `runLazyExpireOrders()` yang membatasi pemeriksaan order kedaluwarsa maksimal sekali per menit. Di lokal/Render, `startExpireOrdersJob()` tetap dipakai.
+- **Koneksi:** `PrismaClient` di-cache di `globalThis` agar tidak membuka koneksi baru setiap request.
+- **Supabase free tier** mem-pause project setelah ±7 hari tanpa aktivitas. Ping `GET /api/health` secara berkala (misalnya cron-job.org) agar project tetap hidup.
+- **Refresh halaman dalam** seperti `/catalog` bergantung pada rewrite SPA di `vercel.json`.
+
 ## Roadmap
 
 1. **Fase 1 (selesai):** auth JWT, onboarding admin→mitra, order + reservasi stok, mock payment, PIN, tiket, cron expiry.
@@ -283,4 +341,4 @@ Halaman login dan register publik memakai panel editorial yang sama dengan Home:
 5. **Fase 5 (selesai):** redesign editorial Home dan header/footer: hero foto, palet sage-ink, kartu tier, section cara kerja, pencarian katalog, serta komponen kartu dan langkah.
 6. **Fase 6 (selesai):** penyamaan desain seluruh alur customer (toko, checkout, pembayaran, tiket, pesanan, ulasan) dengan bahasa visual Home, termasuk header foto bersama dan penghapusan aksen amber.
 7. **Fase 7 (selesai):** penyamaan desain area mitra (dasbor, stok & jadwal, terminal verifikasi PIN) dengan bahasa visual Home dan alur customer, termasuk penghapusan aksen amber/stone.
-8. **Fase 8 (berikutnya):** deploy frontend Vercel, backend Render, database Neon/Supabase, lalu hardening produksi.
+8. **Fase 8 (berikutnya):** deploy frontend & API ke Vercel, database Supabase, lalu hardening produksi.

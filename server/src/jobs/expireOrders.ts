@@ -4,11 +4,59 @@ import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 import { expireOverduePendingOrders } from '../utils/orderLifecycle.js'
 
+export type ExpireResult = {
+  pending: number
+  paid: number
+}
+
 /**
- * Setiap menit:
- *  - order PENDING yang lewat batas bayar menjadi EXPIRED dan stoknya dikembalikan.
- *  - order PAID yang melewati batas pickup menjadi EXPIRED (no refund).
+ * Menutup order yang sudah lewat batas:
+ *  - PENDING yang lewat batas bayar menjadi EXPIRED dan stoknya dikembalikan.
+ *  - PAID yang melewati batas pickup menjadi EXPIRED (no refund).
  */
+export async function processExpiredOrders(): Promise<ExpireResult> {
+  const pending = await expireOverduePendingOrders()
+
+  const paid = await prisma.order.updateMany({
+    where: {
+      status: 'PAID',
+      expiresAt: { lt: new Date() },
+    },
+    data: { status: 'EXPIRED' },
+  })
+
+  return { pending, paid: paid.count }
+}
+
+const LAZY_INTERVAL_MS = 60_000
+let lastLazyRun = 0
+
+/**
+ * Pengganti cron di lingkungan serverless: dipanggil dari middleware dan
+ * dibatasi maksimal sekali per menit per instance.
+ */
+export async function runLazyExpireOrders(): Promise<void> {
+  const now = Date.now()
+
+  if (now - lastLazyRun < LAZY_INTERVAL_MS) {
+    return
+  }
+
+  lastLazyRun = now
+
+  try {
+    const { pending, paid } = await processExpiredOrders()
+
+    if (pending > 0 || paid > 0) {
+      console.log(
+        `[jobs] ${pending} pesanan PENDING dibatalkan, ${paid} pesanan PAID kedaluwarsa.`,
+      )
+    }
+  } catch (error) {
+    console.error('[jobs] Gagal memproses pesanan kedaluwarsa:', error)
+  }
+}
+
 export function startExpireOrdersJob(): void {
   if (env.NODE_ENV === 'test') {
     return
@@ -18,19 +66,11 @@ export function startExpireOrdersJob(): void {
     '* * * * *',
     async () => {
       try {
-        const pending = await expireOverduePendingOrders()
+        const { pending, paid } = await processExpiredOrders()
 
-        const paid = await prisma.order.updateMany({
-          where: {
-            status: 'PAID',
-            expiresAt: { lt: new Date() },
-          },
-          data: { status: 'EXPIRED' },
-        })
-
-        if (pending > 0 || paid.count > 0) {
+        if (pending > 0 || paid > 0) {
           console.log(
-            `[jobs] ${pending} pesanan PENDING dibatalkan, ${paid.count} pesanan PAID kedaluwarsa.`,
+            `[jobs] ${pending} pesanan PENDING dibatalkan, ${paid} pesanan PAID kedaluwarsa.`,
           )
         }
       } catch (error) {
