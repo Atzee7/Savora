@@ -3,7 +3,12 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-const DEMO_PASSWORD = 'password123'
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? ''
+
+if (DEMO_PASSWORD.length < 12) {
+  console.error('DEMO_PASSWORD wajib diisi (minimal 12 karakter) di server/.env sebelum menjalankan seed.')
+  process.exit(1)
+}
 
 /** Waktu disimpan sebagai kolom TIME; gunakan UTC agar jam tersimpan apa adanya. */
 const time = (hour: number, minute: number) => new Date(Date.UTC(1970, 0, 1, hour, minute))
@@ -225,10 +230,11 @@ async function main() {
   }
 
   console.log('Seed selesai.')
-  console.log(`Akun demo (password: ${DEMO_PASSWORD}):`)
+  console.log('Akun demo (password dari DEMO_PASSWORD):')
   console.log('  customer@savora.id')
   console.log('  merchant@savora.id')
   console.log('  admin@savora.id')
+  console.log('  merchant2@savora.id … merchant8@savora.id')
 }
 
 main()

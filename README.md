@@ -4,6 +4,8 @@ Marketplace **hyper-local food rescue** untuk Malang. Savora menghubungkan toko 
 
 > Dokumen produk lengkap ada di [`PRD.md`](./PRD.md).
 
+**Demo live:** <https://savora-lyart-six.vercel.app>
+
 ## Status Saat Ini
 
 Repo ini berisi fondasi aplikasi, katalog publik, alur onboarding tiga role, alur order customer, operasional mitra, serta monitoring admin yang sudah terhubung ke database.
@@ -112,9 +114,10 @@ Savora/
    ```env
    DATABASE_URL="postgresql://postgres:PASSWORD_KAMU@localhost:5432/savora?schema=public"
    JWT_SECRET="ganti-dengan-string-acak-minimal-32-karakter"
+   DEMO_PASSWORD="password-demo-minimal-12-karakter"
    ```
 
-   File `.env` sudah dibuat untuk development dan **tidak** ikut ter-commit.
+   File `.env` sudah dibuat untuk development dan **tidak** ikut ter-commit. `DEMO_PASSWORD` dipakai `npm run seed` untuk akun demo; nilainya tidak disimpan di repo.
 
 4. Jalankan migrasi dan seed:
 
@@ -137,7 +140,11 @@ Savora/
 
 ## Akun Demo
 
-Semua akun memakai password `password123`.
+Password akun demo diambil dari `DEMO_PASSWORD` di `server/.env` dan tidak ditulis di repo. Untuk mengganti password di database yang sedang berjalan:
+
+```bash
+npm run demo:password
+```
 
 | Role | Email | Catatan |
 | :--- | :--- | :--- |
@@ -145,11 +152,11 @@ Semua akun memakai password `password123`.
 | Merchant | `merchant@savora.id` | Pemilik Roti Asri Lowokwaru |
 | Admin | `admin@savora.id` | Untuk panel admin |
 
-Seed juga membuat merchant2–merchant8 untuk toko lainnya.
+Seed juga membuat merchant2–merchant8 untuk toko lainnya; semuanya memakai `DEMO_PASSWORD` yang sama.
 
 Registrasi publik di `/auth/register` hanya membuat akun **customer**. Akun mitra dibuat admin dari panel `/admin`; setelah itu mitra masuk lewat halaman login yang sama. Jangan mendaftarkan email mitra lewat form publik.
 
-Halaman login dan register publik memakai panel editorial yang sama dengan Home: satu kolom foto gelap dengan wordmark **Savora**, dan satu kolom form putih dengan eyebrow hijau, input membulat, serta tombol utama pill gelap. Halaman login menyediakan tombol **Gunakan akun demo**. Kredensial mitra dan admin tetap ada di tabel ini untuk kebutuhan pengujian, tetapi tidak lagi ditampilkan di halaman user.
+Halaman login dan register publik memakai panel editorial yang sama dengan Home: satu kolom foto gelap dengan wordmark **Savora**, dan satu kolom form putih dengan eyebrow hijau, input membulat, serta tombol utama pill gelap. Kredensial mitra dan admin tidak ditampilkan di halaman publik; akun mitra dibuat admin dari panel `/admin`.
 
 ## Alur Halaman User
 
@@ -286,7 +293,7 @@ Database memakai PostgreSQL Supabase. Frontend dan API berbagi domain, jadi `VIT
 
 ### 1. Supabase
 
-1. Buat project baru, pilih region terdekat (Singapore).
+1. Buat project baru. Pilih region yang dekat dengan region function Vercel (proyek ini memakai `dub1`/Dublin, jadi database idealnya `eu-west-1`).
 2. Buka **Connect** dan salin dua connection string:
    - **Transaction pooler** (port `6543`) → `DATABASE_URL`, tambahkan `?pgbouncer=true&connection_limit=1&sslmode=require`.
    - **Session pooler** (port `5432`) → `DIRECT_URL`, tambahkan `?sslmode=require`.
@@ -295,12 +302,12 @@ Database memakai PostgreSQL Supabase. Frontend dan API berbagi domain, jadi `VIT
 ### 2. Migrasi dan seed
 
 ```bash
-# isi DATABASE_URL + DIRECT_URL di server/.env dengan nilai Supabase
+# isi DATABASE_URL, DIRECT_URL, dan DEMO_PASSWORD di server/.env
 npm run db:deploy
 npm run seed
 ```
 
-`DIRECT_URL` hanya dipakai Prisma untuk migrasi; Prisma Client memakai `DATABASE_URL` yang lewat pooler.
+`DIRECT_URL` hanya dipakai Prisma untuk migrasi; Prisma Client memakai `DATABASE_URL` yang lewat pooler. Password akun demo diambil dari `DEMO_PASSWORD`, bukan dari kode.
 
 ### 3. Environment Vercel
 
@@ -321,15 +328,15 @@ Import repo ke Vercel tanpa mengubah Root Directory. `vercel.json` memakai model
 | Service | Root | Peran |
 | :--- | :--- | :--- |
 | `web` | `client/` | build Vite, output `dist`, fallback SPA ke `index.html` |
-| `api` | `server/` | Express, entrypoint `dist/app.js` hasil build `tsc` |
+| `api` | `server/` | Express, entrypoint `src/app.ts` (Vercel meng-compile TypeScript) |
 
-Request `/api/*` dirutekan ke service `api`, sisanya ke `web`. Vercel membangun kedua service secara terpisah dalam satu deployment.
+Request `/api/*` dirutekan ke service `api`, sisanya ke `web`. Vercel membangun kedua service secara terpisah dalam satu deployment. `regions` di `vercel.json` menaruh function di `dub1` agar dekat dengan database Supabase `eu-west-1`.
 
 ### Catatan produksi
 
 - **Cron:** `node-cron` tidak berjalan di serverless. Saat `process.env.VERCEL` terisi, `server/src/app.ts` memanggil `runLazyExpireOrders()` yang membatasi pemeriksaan order kedaluwarsa maksimal sekali per menit. Di lokal/Render, `startExpireOrdersJob()` tetap dipakai.
 - **Koneksi:** `PrismaClient` di-cache di `globalThis` agar tidak membuka koneksi baru setiap request.
-- **Supabase free tier** mem-pause project setelah ±7 hari tanpa aktivitas. Ping `GET /api/health` secara berkala (misalnya cron-job.org) agar project tetap hidup.
+- **Supabase free tier** mem-pause project setelah ±7 hari tanpa aktivitas. Workflow `.github/workflows/uptime.yml` memanggil `GET /api/health` setiap hari (termasuk `workflow_dispatch` manual) agar project tetap hidup.
 - **Refresh halaman dalam** seperti `/catalog` bergantung pada rewrite SPA di `vercel.json`.
 
 ## Roadmap
@@ -341,4 +348,4 @@ Request `/api/*` dirutekan ke service `api`, sisanya ke `web`. Vercel membangun 
 5. **Fase 5 (selesai):** redesign editorial Home dan header/footer: hero foto, palet sage-ink, kartu tier, section cara kerja, pencarian katalog, serta komponen kartu dan langkah.
 6. **Fase 6 (selesai):** penyamaan desain seluruh alur customer (toko, checkout, pembayaran, tiket, pesanan, ulasan) dengan bahasa visual Home, termasuk header foto bersama dan penghapusan aksen amber.
 7. **Fase 7 (selesai):** penyamaan desain area mitra (dasbor, stok & jadwal, terminal verifikasi PIN) dengan bahasa visual Home dan alur customer, termasuk penghapusan aksen amber/stone.
-8. **Fase 8 (berikutnya):** deploy frontend & API ke Vercel, database Supabase, lalu hardening produksi.
+8. **Fase 8 (selesai):** deploy frontend & API ke Vercel (Services), database Supabase, plus uptime ping harian.
