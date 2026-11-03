@@ -75,11 +75,6 @@ defineProps<{
             >
               <div class="flex items-center justify-between gap-4">
                 <span class="text-[13px] font-extrabold tracking-tight text-ink-950">Savora</span>
-                <span
-                  class="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-600"
-                >
-                  Malang / WIB
-                </span>
               </div>
               <div class="mt-3 flex items-center gap-3">
                 <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-600">

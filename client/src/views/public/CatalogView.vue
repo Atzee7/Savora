@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import LiveBadge from '@/components/common/LiveBadge.vue'
 import StoreCard from '@/components/store/StoreCard.vue'
 import StoreMap from '@/components/store/StoreMap.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
@@ -96,9 +95,6 @@ const filteredStores = computed(() => {
       <p class="text-sm font-semibold text-ink-500">
         <span class="text-ink-950">{{ filteredStores.length }}</span> toko ditemukan
       </p>
-      <div class="flex flex-wrap items-center gap-3">
-        <LiveBadge :updated-at="catalog.lastUpdated" label="Stok otomatis" />
-      </div>
     </div>
 
     <div v-if="catalog.loading" class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

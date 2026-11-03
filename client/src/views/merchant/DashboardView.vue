@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { merchantService } from '@/services/merchant.service'
 import { useAuthStore } from '@/stores/auth'
 import type { MerchantSummary, Store, TierName } from '@/types'
@@ -34,9 +36,18 @@ const todayLabel = new Intl.DateTimeFormat('id-ID', {
   year: 'numeric',
 }).format(new Date())
 
-async function load(): Promise<void> {
-  loading.value = true
-  loadError.value = ''
+interface LoadOptions {
+  /** Perbarui data di latar belakang tanpa skeleton atau pesan error. */
+  silent?: boolean
+}
+
+async function load(options: LoadOptions = {}): Promise<void> {
+  const silent = options.silent === true
+
+  if (!silent) {
+    loading.value = true
+    loadError.value = ''
+  }
 
   try {
     const [loadedStore, loadedSummary] = await Promise.all([
@@ -45,12 +56,25 @@ async function load(): Promise<void> {
     ])
     store.value = loadedStore
     summary.value = loadedSummary
+    loadError.value = ''
   } catch (error) {
+    if (silent) {
+      // Biarkan data terakhir tampil; badge tidak diperbarui pada percobaan gagal.
+      throw error
+    }
+
     loadError.value = getErrorMessage(error, 'Dasbor mitra belum bisa dimuat.')
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
+
+const { lastUpdated, refresh } = useAutoRefresh(() => load({ silent: true }), {
+  interval: 20_000,
+  enabled: () => !loading.value,
+})
 
 onMounted(() => {
   void load()
@@ -72,7 +96,7 @@ onMounted(() => {
       <EmptyState title="Dasbor belum bisa dimuat" :description="loadError">
         <template #icon>🏪</template>
         <template #action>
-          <AppButton variant="ink" @click="load">Coba lagi</AppButton>
+          <AppButton variant="ink" @click="load()">Coba lagi</AppButton>
         </template>
       </EmptyState>
     </div>
@@ -122,11 +146,14 @@ onMounted(() => {
         </template>
       </PageHero>
 
-      <div class="mt-6 flex items-center justify-between gap-3">
-        <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
-          Ringkasan hari ini
-        </p>
-        <AppButton variant="secondary" size="sm" @click="load">Muat ulang data</AppButton>
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+            Ringkasan hari ini
+          </p>
+          <LiveBadge :updated-at="lastUpdated" label="Otomatis" />
+        </div>
+        <AppButton variant="secondary" size="sm" @click="refresh()">Muat ulang data</AppButton>
       </div>
 
       <section

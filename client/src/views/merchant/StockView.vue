@@ -3,8 +3,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { merchantService } from '@/services/merchant.service'
 import type { Store, Tier, TierName } from '@/types'
 import { getErrorMessage } from '@/utils/error'
@@ -65,18 +67,73 @@ function syncForm(loaded: Store): void {
   }
 }
 
-async function load(): Promise<void> {
-  loading.value = true
-  loadError.value = ''
+async function load(options: { silent?: boolean } = {}): Promise<void> {
+  const silent = options.silent === true
+
+  if (!silent) {
+    loading.value = true
+    loadError.value = ''
+  }
 
   try {
     const loaded = await merchantService.getStore()
-    store.value = loaded
-    syncForm(loaded)
+
+    if (silent) {
+      applySilentUpdate(loaded)
+    } else {
+      store.value = loaded
+      syncForm(loaded)
+    }
+
+    loadError.value = ''
   } catch (error) {
+    if (silent) {
+      throw error
+    }
+
     loadError.value = getErrorMessage(error, 'Data toko belum bisa dimuat.')
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
+  }
+}
+
+/**
+ * Perbarui data dari server tanpa menimpa draft yang belum disimpan.
+ * Draft yang sudah sama dengan nilai lama ikut mengikuti nilai terbaru.
+ */
+function applySilentUpdate(loaded: Store): void {
+  const previous = store.value
+  store.value = loaded
+
+  const loadedIds = new Set(loaded.tiers.map((tier) => tier.id))
+
+  for (const tier of loaded.tiers) {
+    const previousStock = previous?.tiers.find((item) => item.id === tier.id)?.stock
+    const draft = stockDraft[tier.id]
+
+    if (draft === undefined || draft === previousStock) {
+      stockDraft[tier.id] = tier.stock
+    }
+  }
+
+  for (const tierId of Object.keys(stockDraft)) {
+    if (!loadedIds.has(tierId)) {
+      delete stockDraft[tierId]
+    }
+  }
+
+  const previousSchedule = previous?.schedules[0]
+  const nextSchedule = loaded.schedules[0]
+  const scheduleUntouched =
+    !previousSchedule ||
+    (scheduleForm.pickupStart === previousSchedule.pickupStart &&
+      scheduleForm.pickupEnd === previousSchedule.pickupEnd)
+
+  if (nextSchedule && scheduleUntouched) {
+    scheduleForm.pickupStart = nextSchedule.pickupStart
+    scheduleForm.pickupEnd = nextSchedule.pickupEnd
   }
 }
 
@@ -89,6 +146,36 @@ function changeStock(tier: Tier, delta: number): void {
 function isDirty(tier: Tier): boolean {
   return (stockDraft[tier.id] ?? 0) !== tier.stock
 }
+
+const hasPendingStock = computed(() => store.value?.tiers.some((tier) => isDirty(tier)) ?? false)
+
+const hasPendingSchedule = computed(() => {
+  const current = schedule.value
+
+  if (!current) {
+    return false
+  }
+
+  return (
+    scheduleForm.pickupStart !== current.pickupStart ||
+    scheduleForm.pickupEnd !== current.pickupEnd
+  )
+})
+
+const hasPendingChanges = computed(() => hasPendingStock.value || hasPendingSchedule.value)
+
+const refreshLabel = computed(() =>
+  hasPendingChanges.value ? 'Dijeda — ada draft' : 'Otomatis',
+)
+
+const { lastUpdated } = useAutoRefresh(() => load({ silent: true }), {
+  interval: 20_000,
+  enabled: () =>
+    !loading.value &&
+    !hasPendingChanges.value &&
+    savingTierId.value === null &&
+    !savingSchedule.value,
+})
 
 async function saveStock(tier: Tier): Promise<void> {
   if (savingTierId.value || !store.value) {
@@ -178,7 +265,7 @@ onMounted(() => {
       <EmptyState title="Data toko belum bisa dimuat" :description="loadError">
         <template #icon>📦</template>
         <template #action>
-          <AppButton variant="ink" @click="load">Coba lagi</AppButton>
+          <AppButton variant="ink" @click="load()">Coba lagi</AppButton>
         </template>
       </EmptyState>
     </div>
@@ -239,7 +326,10 @@ onMounted(() => {
                 Tiga kantong, tiga ukuran.
               </h2>
             </div>
-            <p class="text-xs text-ink-600">Draft {{ totalDraft }} kantong</p>
+            <div class="flex flex-col items-start gap-2 sm:items-end">
+              <LiveBadge :updated-at="lastUpdated" :label="refreshLabel" />
+              <p class="text-xs text-ink-600">Draft {{ totalDraft }} kantong</p>
+            </div>
           </div>
 
           <div

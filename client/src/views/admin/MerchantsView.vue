@@ -8,6 +8,7 @@ import { adminService } from '@/services/admin.service'
 import type { AdminMerchant } from '@/types'
 import { getErrorMessage } from '@/utils/error'
 import { formatDate, formatTimeRange } from '@/utils/format'
+import { formatCoord, isShortMapsLink, parseMapsLink } from '@/utils/mapsLink'
 
 const merchants = ref<AdminMerchant[]>([])
 const loading = ref(true)
@@ -26,11 +27,15 @@ const form = reactive({
   password: '',
   storeName: '',
   address: '',
+  mapsLink: '',
   latitude: '-7.9666',
   longitude: '112.6326',
   pickupStart: '20:00',
   pickupEnd: '21:00',
 })
+
+const mapsError = ref('')
+const mapsStatus = ref('')
 
 function resetForm(): void {
   Object.assign(form, {
@@ -40,11 +45,52 @@ function resetForm(): void {
     password: '',
     storeName: '',
     address: '',
+    mapsLink: '',
     latitude: '-7.9666',
     longitude: '112.6326',
     pickupStart: '20:00',
     pickupEnd: '21:00',
   })
+  mapsError.value = ''
+  mapsStatus.value = ''
+}
+
+function applyCoords(latitude: number, longitude: number): void {
+  form.latitude = formatCoord(latitude)
+  form.longitude = formatCoord(longitude)
+  mapsError.value = ''
+  mapsStatus.value = `Koordinat terisi: ${formatCoord(latitude)}, ${formatCoord(longitude)}`
+}
+
+function applyMapsLink(): void {
+  const value = form.mapsLink.trim()
+
+  if (!value) {
+    mapsError.value = ''
+    mapsStatus.value = ''
+    return
+  }
+
+  const coords = parseMapsLink(value)
+
+  if (!coords) {
+    mapsError.value = isShortMapsLink(value)
+      ? 'Link pendek tidak memuat koordinat. Buka link itu, lalu salin URL lengkap dari address bar.'
+      : 'Koordinat tidak ditemukan di link ini. Pastikan link berasal dari Google Maps.'
+    mapsStatus.value = ''
+    return
+  }
+
+  applyCoords(coords.latitude, coords.longitude)
+}
+
+function handleMapsPaste(event: ClipboardEvent): void {
+  const text = event.clipboardData?.getData('text') ?? ''
+  const coords = parseMapsLink(text)
+
+  if (coords) {
+    applyCoords(coords.latitude, coords.longitude)
+  }
 }
 
 const filteredMerchants = computed(() => {
@@ -229,13 +275,28 @@ onMounted(() => {
                 required
               />
             </div>
+            <div class="sm:col-span-2">
+              <AppInput
+                v-model="form.mapsLink"
+                label="Link Google Maps (opsional)"
+                placeholder="https://www.google.com/maps/place/..."
+                autocomplete="off"
+                hint="Tempel link tempat dari Google Maps, koordinat terisi otomatis."
+                :error="mapsError || undefined"
+                @paste="handleMapsPaste"
+                @blur="applyMapsLink"
+              />
+              <p v-if="mapsStatus && !mapsError" class="mt-1.5 text-xs font-semibold text-brand-700">
+                {{ mapsStatus }}
+              </p>
+            </div>
             <AppInput v-model="form.latitude" label="Latitude" type="number" step="any" required />
             <AppInput v-model="form.longitude" label="Longitude" type="number" step="any" required />
             <AppInput v-model="form.pickupStart" label="Pickup mulai" type="time" required />
             <AppInput v-model="form.pickupEnd" label="Pickup selesai" type="time" required />
           </div>
           <p class="mt-3 text-xs leading-relaxed text-stone-400">
-            Latitude/longitude default berada di pusat Malang. Sesuaikan dengan lokasi toko agar pin peta akurat.
+            Latitude/longitude default berada di pusat Malang. Tempel link Google Maps di atas atau isi manual agar pin peta akurat.
           </p>
         </div>
 

@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
 import PageHero from '@/components/common/PageHero.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { merchantService } from '@/services/merchant.service'
 import type { PinVerificationResult, Store } from '@/types'
 import { getErrorMessage } from '@/utils/error'
@@ -95,11 +97,21 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+async function loadStore(): Promise<void> {
+  store.value = await merchantService.getStore()
+}
+
+/** Jadwal pickup bisa diubah dari tab lain; terminal ikut menyesuaikan. */
+const { lastUpdated } = useAutoRefresh(loadStore, {
+  interval: 30_000,
+  enabled: () => !verifying.value,
+})
+
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
 
   try {
-    store.value = await merchantService.getStore()
+    await loadStore()
   } catch {
     store.value = null
   }
@@ -158,6 +170,8 @@ onBeforeUnmount(() => {
           </span>
           <span class="text-white/30" aria-hidden="true">·</span>
           <span>PIN hanya bisa dipakai sekali</span>
+          <span class="text-white/30" aria-hidden="true">·</span>
+          <LiveBadge :updated-at="lastUpdated" label="Jadwal otomatis" tone="dark" />
         </template>
       </PageHero>
     </div>

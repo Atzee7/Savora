@@ -21,7 +21,6 @@ const form = reactive({
 
 const submitting = ref(false)
 const error = ref('')
-const demoFilled = ref(false)
 
 const facts = [
   { label: 'Tier harga', value: 'Rp15rb / Rp25rb / Rp35rb' },
@@ -29,20 +28,12 @@ const facts = [
   { label: 'Biaya layanan', value: 'Gratis' },
 ]
 
-function fillDemo(): void {
-  form.email = 'customer@savora.id'
-  form.password = 'password123'
-  error.value = ''
-  demoFilled.value = true
-}
-
 async function submit(): Promise<void> {
   if (submitting.value) {
     return
   }
 
   error.value = ''
-  demoFilled.value = false
   submitting.value = true
 
   try {
@@ -99,23 +90,6 @@ async function submit(): Promise<void> {
         Masuk ke Savora
       </AppButton>
     </form>
-
-    <div class="mt-6 border-t border-dashed border-ink-900/20 pt-5">
-      <p class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-ink-600">Akun demo</p>
-      <p class="mt-1.5 text-xs leading-relaxed text-ink-600">
-        Isi otomatis akun customer demo, lalu tekan Masuk.
-      </p>
-      <button
-        type="button"
-        class="mt-3 inline-flex min-h-11 items-center justify-center rounded-full border border-ink-900/15 bg-white px-4 py-2 text-xs font-bold text-ink-900 transition hover:border-ink-900/30 hover:bg-sage-100"
-        @click="fillDemo"
-      >
-        Isi akun demo
-      </button>
-      <p v-if="demoFilled" role="status" class="mt-2 text-xs font-bold text-brand-700">
-        Akun demo terisi. Tekan Masuk untuk melanjutkan.
-      </p>
-    </div>
 
     <template #switch>
       <p class="text-sm text-sage-200">

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 
 import FeatureCard from '@/components/home/FeatureCard.vue'
 import StepItem from '@/components/home/StepItem.vue'
 import TierCard from '@/components/home/TierCard.vue'
-import LiveBadge from '@/components/common/LiveBadge.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
@@ -13,23 +12,6 @@ const auth = useAuthStore()
 const catalog = useCatalogStore()
 
 useAutoRefresh(() => catalog.refreshStores(), { interval: 30_000 })
-
-const stores = computed(() => catalog.stores)
-const totalBags = computed(() =>
-  stores.value.reduce((total, store) => total + store.totalStock, 0),
-)
-
-const heroBadge = computed(() => {
-  if (catalog.loading) {
-    return 'Memuat kantong malam ini'
-  }
-
-  if (stores.value.length === 0) {
-    return 'Stok dibuka menjelang pickup'
-  }
-
-  return `${totalBags.value} kantong dari ${stores.value.length} toko`
-})
 
 const stats = [
   { icon: 'tier', value: '3', label: 'Tier harga tetap' },
@@ -126,13 +108,7 @@ onMounted(() => {
           <div
             class="relative flex min-h-[34rem] flex-col justify-between p-6 sm:min-h-[38rem] sm:p-10 lg:min-h-[42rem] lg:p-14"
           >
-            <div class="flex items-start justify-between gap-4">
-              <span
-                class="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur"
-              >
-                <span class="h-1.5 w-1.5 rounded-full bg-brand-300" aria-hidden="true" />
-                Food rescue
-              </span>
+            <div class="flex items-start justify-end gap-4">
               <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-sage-100">
                 Malang, ID
               </span>
@@ -166,16 +142,9 @@ onMounted(() => {
             </div>
 
             <div
-              class="flex flex-wrap items-center justify-between gap-3 border-t border-white/15 pt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-sage-200"
+              class="flex flex-wrap items-center justify-end gap-3 border-t border-white/15 pt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-sage-200"
             >
-              <span class="inline-flex items-center gap-2">
-                <span class="h-1.5 w-1.5 rounded-full bg-brand-300" aria-hidden="true" />
-                {{ heroBadge }}
-              </span>
-              <div class="flex flex-wrap items-center gap-2">
-                <span>Pickup malam ini</span>
-                <LiveBadge tone="dark" :updated-at="catalog.lastUpdated" label="Stok otomatis" />
-              </div>
+              <span>Pickup malam ini</span>
             </div>
           </div>
         </div>
