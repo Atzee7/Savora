@@ -2,7 +2,6 @@
 import { onMounted, ref, watch } from 'vue'
 
 import EmptyState from '@/components/common/EmptyState.vue'
-import LiveBadge from '@/components/common/LiveBadge.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import StoreMap from '@/components/store/StoreMap.vue'
@@ -26,7 +25,7 @@ const notes = [
   'Tunjukkan PIN 4 digit ke kasir pada jam pickup. Pesanan hangus jika terlewat.',
 ]
 
-const { lastUpdated } = useAutoRefresh(refreshStore, {
+useAutoRefresh(refreshStore, {
   interval: 20_000,
   enabled: () => !loading.value && store.value !== null,
 })
@@ -37,7 +36,6 @@ async function loadStore(): Promise<void> {
 
   try {
     store.value = await storeService.getById(props.id)
-    lastUpdated.value = new Date()
   } catch (loadError) {
     store.value = null
     error.value = getErrorMessage(loadError, 'Toko tidak ditemukan atau sedang tidak aktif.')
@@ -137,12 +135,9 @@ watch(
 
       <div class="mt-10 grid gap-8 lg:grid-cols-[1fr_22rem]">
         <section>
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
-              Pilih paket
-            </p>
-            <LiveBadge :updated-at="lastUpdated" label="Stok otomatis" />
-          </div>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
+            Pilih paket
+          </p>
           <h2 class="mt-3 text-2xl font-extrabold tracking-tight text-ink-950 sm:text-3xl">
             Tiga tier, satu kejutan.
           </h2>

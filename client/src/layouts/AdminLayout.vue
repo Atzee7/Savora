@@ -1,10 +1,32 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const initials = computed(() => {
+  const name = auth.user?.name?.trim()
+
+  if (!name) {
+    return 'A'
+  }
+
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+})
+
+const currentYear = new Date().getFullYear()
+
+const navItems = [
+  { to: '/admin', label: 'Mitra & toko', exact: true },
+  { to: '/admin/monitoring', label: 'Monitoring & red flag', exact: false },
+]
 
 async function logout(): Promise<void> {
   auth.logout()
@@ -13,86 +35,94 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <div class="min-h-screen bg-stone-100 lg:grid lg:grid-cols-[16rem_1fr]">
-    <aside class="hidden border-r border-stone-800 bg-stone-950 text-stone-300 lg:flex lg:flex-col">
-      <div class="flex h-16 items-center gap-3 border-b border-stone-800 px-5">
-        <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-500 text-base font-extrabold text-stone-950">
-          S
-        </span>
-        <div class="leading-tight">
-          <p class="text-sm font-extrabold text-white">Savora</p>
-          <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-400">Admin console</p>
+  <div class="flex min-h-screen flex-col bg-sage-100">
+    <header class="sticky top-0 z-40 border-b border-ink-900/10 bg-sage-100/85 backdrop-blur">
+      <div class="container-page flex h-[4.5rem] items-center gap-4">
+        <RouterLink to="/admin" class="flex shrink-0 items-center gap-2">
+          <span class="text-xl font-extrabold tracking-tight text-ink-950">Savora</span>
+          <span
+            class="rounded-full bg-ink-900 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white"
+          >
+            Admin
+          </span>
+        </RouterLink>
+
+        <nav class="ml-4 hidden items-center gap-1 md:flex" aria-label="Navigasi admin">
+          <RouterLink
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            class="rounded-full px-4 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950"
+            :exact-active-class="item.exact ? 'bg-ink-900 text-white hover:bg-ink-800 hover:text-white' : ''"
+            :active-class="item.exact ? '' : 'bg-ink-900 text-white hover:bg-ink-800 hover:text-white'"
+          >
+            {{ item.label }}
+          </RouterLink>
+        </nav>
+
+        <div class="ml-auto flex items-center gap-2">
+          <RouterLink
+            to="/catalog"
+            class="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950 lg:inline-flex"
+          >
+            Lihat katalog
+          </RouterLink>
+
+          <div class="hidden items-center gap-2.5 sm:flex">
+            <span
+              class="grid h-9 w-9 place-items-center rounded-full border border-ink-900/10 bg-white text-[11px] font-extrabold text-ink-800"
+              aria-hidden="true"
+            >
+              {{ initials }}
+            </span>
+            <div class="hidden leading-tight lg:block">
+              <p class="max-w-[10rem] truncate text-xs font-bold text-ink-950">
+                {{ auth.user?.name }}
+              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">Admin</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center justify-center rounded-full border border-ink-900/15 bg-white px-3.5 py-2 text-xs font-semibold text-ink-800 transition hover:border-ink-900/30 hover:bg-sage-100"
+            @click="logout"
+          >
+            Keluar
+          </button>
         </div>
       </div>
 
-      <nav class="flex-1 space-y-1 px-3 py-5">
-        <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">Operasional</p>
+      <nav
+        class="container-page no-scrollbar flex gap-1 overflow-x-auto pb-3 md:hidden"
+        aria-label="Navigasi admin"
+      >
         <RouterLink
-          to="/admin"
-          class="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-stone-900 hover:text-white"
-          exact-active-class="bg-stone-800 text-white"
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-ink-600 transition hover:bg-sage-200/70 hover:text-ink-950"
+          :exact-active-class="item.exact ? 'bg-ink-900 text-white' : ''"
+          :active-class="item.exact ? '' : 'bg-ink-900 text-white'"
         >
-          Mitra &amp; toko
-          <span class="rounded bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-bold text-brand-400">Admin</span>
-        </RouterLink>
-        <RouterLink
-          to="/admin/monitoring"
-          class="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-stone-900 hover:text-white"
-          active-class="bg-stone-800 text-white"
-        >
-          Monitoring &amp; red flag
-          <span class="text-xs text-stone-600">📡</span>
-        </RouterLink>
-        <RouterLink
-          to="/catalog"
-          class="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-400 transition hover:bg-stone-900 hover:text-white"
-        >
-          Katalog publik
-          <span class="text-xs text-stone-600">↗</span>
+          {{ item.label }}
         </RouterLink>
       </nav>
+    </header>
 
-      <div class="border-t border-stone-800 p-4">
-        <p class="truncate text-sm font-semibold text-white">{{ auth.user?.name ?? 'Admin' }}</p>
-        <p class="mt-0.5 truncate text-[11px] text-stone-500">{{ auth.user?.email }}</p>
-        <button
-          type="button"
-          class="mt-3 w-full rounded-lg border border-stone-800 px-3 py-2 text-xs font-semibold text-stone-400 transition hover:border-red-900 hover:text-red-400"
-          @click="logout"
-        >
-          Keluar dari akun
-        </button>
-      </div>
-    </aside>
-
-    <div class="flex min-h-screen flex-col">
-      <header class="border-b border-stone-200 bg-white lg:hidden">
-        <div class="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
-          <RouterLink to="/admin" class="flex items-center gap-2.5">
-            <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-base font-extrabold text-white">S</span>
-            <span class="text-sm font-extrabold text-stone-900">Admin</span>
-          </RouterLink>
-          <div class="flex items-center gap-3">
-            <RouterLink to="/admin/monitoring" class="text-xs font-semibold text-stone-500">Monitoring</RouterLink>
-            <RouterLink to="/catalog" class="text-xs font-semibold text-stone-500">Katalog</RouterLink>
-            <button
-              type="button"
-              class="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-500"
-              @click="logout"
-            >
-              Keluar
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main class="flex-1">
+    <main class="flex-1">
+      <div class="container-page py-8 sm:py-10">
         <RouterView />
-      </main>
+      </div>
+    </main>
 
-      <footer class="border-t border-stone-200 px-4 py-4 text-[11px] text-stone-400 sm:px-6 lg:px-8">
-        Savora admin · data lokal PostgreSQL · {{ new Date().getFullYear() }}
-      </footer>
-    </div>
+    <footer class="border-t border-ink-900/10 bg-white">
+      <div
+        class="container-page flex flex-col gap-2 py-6 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p>© {{ currentYear }} Savora Admin. Operasional mitra dan monitoring Malang.</p>
+        <p>Data lokal PostgreSQL · perhitungan hari berjalan WIB.</p>
+      </div>
+    </footer>
   </div>
 </template>

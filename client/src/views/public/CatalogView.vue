@@ -7,12 +7,23 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import StoreCard from '@/components/store/StoreCard.vue'
 import StoreMap from '@/components/store/StoreMap.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { useUserLocation } from '@/composables/useUserLocation'
 import { useCatalogStore } from '@/stores/catalog'
+import { formatDistance, haversineKm } from '@/utils/distance'
 
 const catalog = useCatalogStore()
 const route = useRoute()
 const router = useRouter()
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+
+const {
+  location,
+  status: locationStatus,
+  error: locationError,
+  supported,
+  request: requestLocation,
+  clear: clearLocation,
+} = useUserLocation()
 
 useAutoRefresh(() => catalog.refreshStores(), { interval: 25_000 })
 
@@ -55,6 +66,54 @@ const filteredStores = computed(() => {
       store.address.toLowerCase().includes(query),
   )
 })
+
+const locating = computed(() => locationStatus.value === 'requesting')
+
+const distanceById = computed(() => {
+  const distances = new Map<string, number>()
+  const origin = location.value
+
+  if (!origin) {
+    return distances
+  }
+
+  for (const store of catalog.stores) {
+    distances.set(
+      store.id,
+      haversineKm(origin.latitude, origin.longitude, store.latitude, store.longitude),
+    )
+  }
+
+  return distances
+})
+
+const visibleStores = computed(() => {
+  if (!location.value) {
+    return filteredStores.value
+  }
+
+  return [...filteredStores.value].sort(
+    (a, b) => (distanceById.value.get(a.id) ?? Infinity) - (distanceById.value.get(b.id) ?? Infinity),
+  )
+})
+
+const nearestId = computed(() =>
+  location.value && visibleStores.value.length > 0 ? visibleStores.value[0].id : null,
+)
+
+const accuracyLabel = computed(() => {
+  const accuracy = location.value?.accuracy
+
+  if (!accuracy || accuracy <= 0) {
+    return ''
+  }
+
+  return formatDistance(accuracy / 1000)
+})
+
+function openStore(storeId: string): void {
+  void router.push({ name: 'store-detail', params: { id: storeId } })
+}
 </script>
 
 <template>
@@ -87,13 +146,78 @@ const filteredStores = computed(() => {
       </div>
     </div>
 
-    <div class="mt-8 overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white p-2 shadow-card">
-      <StoreMap :stores="filteredStores" height="19rem" />
+    <div class="mt-8 overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white shadow-card">
+      <div
+        class="flex flex-col gap-3 border-b border-ink-900/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <template v-if="location">
+            <AppButton
+              variant="secondary"
+              size="sm"
+              :loading="locating"
+              @click="requestLocation"
+            >
+              Perbarui lokasi
+            </AppButton>
+            <AppButton variant="ghost" size="sm" @click="clearLocation">Hapus lokasi</AppButton>
+          </template>
+          <AppButton
+            v-else
+            variant="ink"
+            size="sm"
+            :loading="locating"
+            :disabled="!supported"
+            @click="requestLocation"
+          >
+            <svg
+              class="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10Z" />
+              <circle cx="12" cy="11" r="2.2" />
+            </svg>
+            {{ locating ? 'Mendeteksi lokasi…' : 'Gunakan lokasi saya' }}
+          </AppButton>
+        </div>
+
+        <p v-if="location" class="text-xs font-semibold text-ink-600">
+          Diurutkan dari yang terdekat
+          <span v-if="accuracyLabel" class="font-normal text-ink-500">
+            · akurasi ±{{ accuracyLabel }}
+          </span>
+        </p>
+        <p v-else-if="locationError" class="text-xs leading-relaxed text-red-700" role="alert">
+          {{ locationError }}
+        </p>
+        <p v-else-if="!supported" class="text-xs text-ink-500">
+          Perangkat ini tidak mendukung deteksi lokasi.
+        </p>
+        <p v-else class="text-xs text-ink-500">
+          Aktifkan lokasi untuk melihat toko terdekat dari posisi kamu.
+        </p>
+      </div>
+
+      <div class="p-2">
+        <StoreMap
+          :stores="visibleStores"
+          :user-location="location"
+          height="19rem"
+          show-store-link
+          @open-store="openStore"
+        />
+      </div>
     </div>
 
     <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
       <p class="text-sm font-semibold text-ink-500">
-        <span class="text-ink-950">{{ filteredStores.length }}</span> toko ditemukan
+        <span class="text-ink-950">{{ visibleStores.length }}</span> toko ditemukan
       </p>
     </div>
 
@@ -121,7 +245,7 @@ const filteredStores = computed(() => {
       </EmptyState>
     </div>
 
-    <div v-else-if="filteredStores.length === 0" class="mt-5">
+    <div v-else-if="visibleStores.length === 0" class="mt-5">
       <EmptyState
         title="Tidak ada toko yang cocok"
         description="Coba kata kunci lain, atau kembali lagi menjelang jam pickup malam ini."
@@ -144,10 +268,12 @@ const filteredStores = computed(() => {
 
     <div v-else class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       <StoreCard
-        v-for="(store, index) in filteredStores"
+        v-for="(store, index) in visibleStores"
         :key="store.id"
         v-reveal="{ delay: (index % 3) * 70 }"
         :store="store"
+        :distance-km="distanceById.get(store.id) ?? null"
+        :is-nearest="store.id === nearestId"
       />
     </div>
   </div>

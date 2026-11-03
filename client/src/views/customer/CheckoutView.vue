@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 
 import AppButton from '@/components/common/AppButton.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import LiveBadge from '@/components/common/LiveBadge.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { orderService } from '@/services/order.service'
@@ -47,7 +46,6 @@ async function load(): Promise<void> {
   try {
     info.value = await orderService.checkoutInfo(props.tierId)
     qty.value = 1
-    lastUpdated.value = new Date()
   } catch (error) {
     info.value = null
     loadError.value = getErrorMessage(error, 'Checkout belum bisa dimuat.')
@@ -68,7 +66,7 @@ async function refreshCheckout(): Promise<void> {
   }
 }
 
-const { lastUpdated } = useAutoRefresh(refreshCheckout, {
+useAutoRefresh(refreshCheckout, {
   interval: 20_000,
   enabled: () => !loading.value && info.value !== null,
 })
@@ -112,7 +110,7 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-5xl">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       <RouterLink
         v-if="info"
         :to="{ name: 'store-detail', params: { id: info.store.id } }"
@@ -127,8 +125,6 @@ onMounted(() => {
       >
         <span aria-hidden="true">←</span> Kembali ke katalog
       </RouterLink>
-
-      <LiveBadge v-if="info" :updated-at="lastUpdated" label="Stok otomatis" />
     </div>
 
     <div v-if="loading" class="mt-6 space-y-5">

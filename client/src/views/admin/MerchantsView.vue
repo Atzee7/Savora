@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 
+import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import LiveBadge from '@/components/common/LiveBadge.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { adminService } from '@/services/admin.service'
 import type { AdminMerchant } from '@/types'
 import { getErrorMessage } from '@/utils/error'
@@ -116,18 +119,36 @@ const stats = computed(() => {
   return { total: merchants.value.length, active, pending, stock }
 })
 
-async function loadMerchants(): Promise<void> {
-  loading.value = true
-  loadError.value = ''
+async function loadMerchants(options: { silent?: boolean } = {}): Promise<void> {
+  const silent = options.silent === true
+
+  if (!silent) {
+    loading.value = true
+    loadError.value = ''
+  }
 
   try {
     merchants.value = await adminService.listMerchants()
+    loadError.value = ''
+    lastUpdated.value = new Date()
   } catch (error) {
+    if (silent) {
+      // Biarkan daftar terakhir tampil; badge tidak diperbarui pada percobaan gagal.
+      throw error
+    }
+
     loadError.value = getErrorMessage(error, 'Daftar mitra belum bisa dimuat.')
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
+
+const { lastUpdated, refresh } = useAutoRefresh(() => loadMerchants({ silent: true }), {
+  interval: 20_000,
+  enabled: () => !loading.value && !submitting.value,
+})
 
 async function submitMerchant(): Promise<void> {
   if (submitting.value) {
@@ -178,71 +199,97 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+  <div>
     <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+        <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-brand-700">
           Operasional / Mitra
         </p>
-        <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
+        <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-950 sm:text-4xl">
           Mitra &amp; toko
         </h1>
-        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500">
-          Akun mitra dibuat dari panel ini. Customer tidak bisa mendaftarkan diri sebagai mitra dari halaman publik.
+        <p class="mt-3 max-w-2xl text-sm leading-relaxed text-ink-600">
+          Akun mitra dibuat dari panel ini. Customer tidak bisa mendaftarkan diri sebagai mitra dari
+          halaman publik.
         </p>
+        <div class="mt-4">
+          <LiveBadge :updated-at="lastUpdated" label="Otomatis" />
+        </div>
       </div>
 
-      <button
-        type="button"
-        class="inline-flex items-center justify-center gap-2 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800"
-        @click="showForm = !showForm"
-      >
-        <span class="text-base leading-none">{{ showForm ? '×' : '+' }}</span>
+      <AppButton variant="ink" size="md" @click="showForm = !showForm">
+        <span class="text-base leading-none" aria-hidden="true">{{ showForm ? '×' : '+' }}</span>
         {{ showForm ? 'Tutup formulir' : 'Tambah mitra' }}
-      </button>
+      </AppButton>
     </header>
 
-    <section class="mt-6 overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div class="grid grid-cols-2 divide-x divide-y divide-stone-100 lg:grid-cols-4 lg:divide-y-0">
-        <div class="px-4 py-4 sm:px-5">
-          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Total mitra</p>
-          <p class="mt-2 text-2xl font-extrabold text-stone-900">{{ stats.total }}</p>
+    <section
+      class="mt-8 overflow-hidden rounded-[2rem] border border-ink-900/10 bg-ink-900/10 shadow-card"
+    >
+      <div class="grid grid-cols-2 gap-px lg:grid-cols-4">
+        <div class="bg-white px-5 py-5 sm:px-6">
+          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">Total mitra</p>
+          <p class="mt-2 text-2xl font-extrabold tracking-tight text-ink-950">{{ stats.total }}</p>
         </div>
-        <div class="px-4 py-4 sm:px-5">
-          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Toko aktif</p>
-          <p class="mt-2 text-2xl font-extrabold text-brand-700">{{ stats.active }}</p>
+        <div class="bg-white px-5 py-5 sm:px-6">
+          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">Toko aktif</p>
+          <p class="mt-2 text-2xl font-extrabold tracking-tight text-brand-700">{{ stats.active }}</p>
         </div>
-        <div class="px-4 py-4 sm:px-5">
-          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Menunggu</p>
-          <p class="mt-2 text-2xl font-extrabold text-amber-700">{{ stats.pending }}</p>
+        <div class="bg-white px-5 py-5 sm:px-6">
+          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">Menunggu</p>
+          <p
+            class="mt-2 text-2xl font-extrabold tracking-tight"
+            :class="stats.pending > 0 ? 'text-red-700' : 'text-ink-950'"
+          >
+            {{ stats.pending }}
+          </p>
         </div>
-        <div class="px-4 py-4 sm:px-5">
-          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Total kantong</p>
-          <p class="mt-2 text-2xl font-extrabold text-stone-900">{{ stats.stock }}</p>
+        <div class="bg-white px-5 py-5 sm:px-6">
+          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">
+            Total kantong
+          </p>
+          <p class="mt-2 text-2xl font-extrabold tracking-tight text-ink-950">{{ stats.stock }}</p>
         </div>
       </div>
     </section>
 
     <div
       v-if="successMessage"
-      class="mt-4 flex items-start justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900"
+      class="mt-4 flex items-start justify-between gap-4 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800"
+      role="status"
     >
       <p class="leading-relaxed">{{ successMessage }}</p>
-      <button type="button" class="shrink-0 text-lg leading-none text-brand-700" @click="successMessage = ''">×</button>
+      <button
+        type="button"
+        class="shrink-0 text-lg leading-none text-brand-700"
+        aria-label="Tutup pesan"
+        @click="successMessage = ''"
+      >
+        ×
+      </button>
     </div>
 
-    <section v-if="showForm" class="mt-6 overflow-hidden rounded-xl border border-stone-300 bg-white">
-      <div class="border-b border-stone-200 px-4 py-4 sm:px-6">
-        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">Akun baru</p>
-        <h2 class="mt-1 text-lg font-extrabold text-stone-900">Buat akun mitra &amp; toko</h2>
-        <p class="mt-1 text-sm text-stone-500">
+    <section
+      v-if="showForm"
+      class="mt-6 overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white shadow-card"
+    >
+      <div class="border-b border-ink-900/10 px-5 py-5 sm:px-6">
+        <p class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-brand-700">
+          Akun baru
+        </p>
+        <h2 class="mt-1 text-lg font-extrabold tracking-tight text-ink-950">
+          Buat akun mitra &amp; toko
+        </h2>
+        <p class="mt-1 text-sm leading-relaxed text-ink-600">
           Role mitra ditetapkan server. Toko langsung aktif dengan tiga tier dan stok awal 0.
         </p>
       </div>
 
-      <form class="space-y-6 px-4 py-5 sm:px-6" @submit.prevent="submitMerchant">
+      <form class="space-y-6 px-5 py-5 sm:px-6" @submit.prevent="submitMerchant">
         <div>
-          <p class="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-stone-400">Akun mitra</p>
+          <p class="mb-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-500">
+            Akun mitra
+          </p>
           <div class="grid gap-4 sm:grid-cols-2">
             <AppInput v-model="form.ownerName" label="Nama pemilik / kasir" autocomplete="name" required />
             <AppInput v-model="form.email" label="Email login" type="email" autocomplete="email" required />
@@ -258,8 +305,10 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="border-t border-stone-100 pt-5">
-          <p class="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-stone-400">Profil toko</p>
+        <div class="border-t border-ink-900/10 pt-5">
+          <p class="mb-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-500">
+            Profil toko
+          </p>
           <div class="grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
               <AppInput v-model="form.storeName" label="Nama toko" required />
@@ -295,84 +344,73 @@ onMounted(() => {
             <AppInput v-model="form.pickupStart" label="Pickup mulai" type="time" required />
             <AppInput v-model="form.pickupEnd" label="Pickup selesai" type="time" required />
           </div>
-          <p class="mt-3 text-xs leading-relaxed text-stone-400">
-            Latitude/longitude default berada di pusat Malang. Tempel link Google Maps di atas atau isi manual agar pin peta akurat.
+          <p class="mt-3 text-xs leading-relaxed text-ink-500">
+            Latitude/longitude default berada di pusat Malang. Tempel link Google Maps di atas atau
+            isi manual agar pin peta akurat.
           </p>
         </div>
 
-        <div v-if="formError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          v-if="formError"
+          class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
           {{ formError }}
         </div>
 
-        <div class="flex flex-col-reverse gap-2 border-t border-stone-100 pt-5 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            class="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
-            @click="showForm = false"
-          >
-            Batal
-          </button>
-          <button
+        <div class="flex flex-col-reverse gap-2 border-t border-ink-900/10 pt-5 sm:flex-row sm:justify-end">
+          <AppButton variant="secondary" size="md" @click="showForm = false">Batal</AppButton>
+          <AppButton
             type="submit"
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
+            variant="primary"
+            size="md"
+            :loading="submitting"
             :disabled="submitting"
           >
-            <span
-              v-if="submitting"
-              class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-              aria-hidden="true"
-            />
             {{ submitting ? 'Membuat akun...' : 'Buat akun mitra' }}
-          </button>
+          </AppButton>
         </div>
       </form>
     </section>
 
-    <section class="mt-6 overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div class="flex flex-col gap-3 border-b border-stone-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+    <section
+      class="mt-6 overflow-hidden rounded-[2rem] border border-ink-900/10 bg-white shadow-card"
+    >
+      <div
+        class="flex flex-col gap-3 border-b border-ink-900/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+      >
         <div>
-          <h2 class="text-sm font-extrabold text-stone-900">Daftar mitra</h2>
-          <p class="mt-0.5 text-xs text-stone-400">{{ filteredMerchants.length }} akun ditampilkan</p>
+          <h2 class="text-lg font-extrabold tracking-tight text-ink-950">Daftar mitra</h2>
+          <p class="mt-0.5 text-xs text-ink-600">{{ filteredMerchants.length }} akun ditampilkan</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex w-full items-center gap-2 sm:w-auto">
           <input
             v-model="search"
             type="search"
-            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:w-56"
+            class="input w-full sm:w-60"
             placeholder="Cari mitra atau toko"
             aria-label="Cari mitra atau toko"
           />
-          <button
-            type="button"
-            class="shrink-0 rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-stone-50"
-            :disabled="loading"
-            @click="loadMerchants"
-          >
+          <AppButton variant="secondary" size="sm" :disabled="loading" @click="refresh()">
             Muat ulang
-          </button>
+          </AppButton>
         </div>
       </div>
 
-      <div v-if="loading" class="space-y-3 p-4 sm:p-5">
-        <div v-for="index in 5" :key="index" class="h-14 animate-pulse rounded-lg bg-stone-100" />
+      <div v-if="loading" class="space-y-3 p-5 sm:p-6">
+        <div v-for="index in 5" :key="index" class="h-14 animate-pulse rounded-2xl bg-sage-200" />
       </div>
 
-      <div v-else-if="loadError" class="p-5">
+      <div v-else-if="loadError" class="p-5 sm:p-6">
         <EmptyState title="Daftar mitra gagal dimuat" :description="loadError">
           <template #icon>⚠️</template>
           <template #action>
-            <button
-              type="button"
-              class="rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white"
-              @click="loadMerchants"
-            >
-              Coba lagi
-            </button>
+            <AppButton variant="ink" @click="loadMerchants()">Coba lagi</AppButton>
           </template>
         </EmptyState>
       </div>
 
-      <div v-else-if="filteredMerchants.length === 0" class="p-5">
+      <div v-else-if="filteredMerchants.length === 0" class="p-5 sm:p-6">
         <EmptyState
           title="Belum ada mitra yang cocok"
           description="Ubah kata pencarian atau buat akun mitra baru dari tombol di atas."
@@ -382,45 +420,58 @@ onMounted(() => {
       </div>
 
       <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-stone-100 text-left text-sm">
-          <thead class="bg-stone-50 text-[10px] font-bold uppercase tracking-[0.12em] text-stone-400">
+        <table class="min-w-full divide-y divide-ink-900/10 text-left text-sm">
+          <thead class="bg-sage-50 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500">
             <tr>
-              <th class="px-4 py-3 sm:px-5">Mitra</th>
-              <th class="px-4 py-3 sm:px-5">Toko</th>
-              <th class="px-4 py-3 sm:px-5">Pickup</th>
-              <th class="px-4 py-3 text-right sm:px-5">Stok</th>
-              <th class="px-4 py-3 sm:px-5">Status</th>
-              <th class="px-4 py-3 sm:px-5">Dibuat</th>
+              <th class="px-5 py-3 sm:px-6">Mitra</th>
+              <th class="px-5 py-3 sm:px-6">Toko</th>
+              <th class="px-5 py-3 sm:px-6">Pickup</th>
+              <th class="px-5 py-3 text-right sm:px-6">Stok</th>
+              <th class="px-5 py-3 sm:px-6">Status</th>
+              <th class="px-5 py-3 sm:px-6">Dibuat</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-stone-100">
-            <tr v-for="merchant in filteredMerchants" :key="merchant.id" class="align-top hover:bg-stone-50/60">
-              <td class="px-4 py-4 sm:px-5">
-                <p class="font-bold text-stone-900">{{ merchant.name }}</p>
-                <p class="mt-0.5 text-xs text-stone-500">{{ merchant.email }}</p>
-                <p v-if="merchant.phone" class="mt-0.5 text-xs text-stone-400">{{ merchant.phone }}</p>
+          <tbody class="divide-y divide-ink-900/10">
+            <tr
+              v-for="merchant in filteredMerchants"
+              :key="merchant.id"
+              class="align-top transition hover:bg-sage-50"
+            >
+              <td class="px-5 py-4 sm:px-6">
+                <p class="font-extrabold text-ink-950">{{ merchant.name }}</p>
+                <p class="mt-0.5 text-xs text-ink-600">{{ merchant.email }}</p>
+                <p v-if="merchant.phone" class="mt-0.5 text-xs text-ink-500">{{ merchant.phone }}</p>
               </td>
-              <td class="px-4 py-4 sm:px-5">
+              <td class="px-5 py-4 sm:px-6">
                 <template v-if="merchant.store">
-                  <p class="font-semibold text-stone-800">{{ merchant.store.storeName }}</p>
-                  <p class="mt-0.5 max-w-xs text-xs leading-relaxed text-stone-500">{{ merchant.store.address }}</p>
+                  <p class="font-semibold text-ink-900">{{ merchant.store.storeName }}</p>
+                  <p class="mt-0.5 max-w-xs text-xs leading-relaxed text-ink-600">
+                    {{ merchant.store.address }}
+                  </p>
                 </template>
-                <span v-else class="text-xs text-amber-700">Belum memiliki toko</span>
+                <span v-else class="text-xs font-semibold text-red-700">Belum memiliki toko</span>
               </td>
-              <td class="whitespace-nowrap px-4 py-4 text-xs text-stone-600 sm:px-5">
+              <td class="whitespace-nowrap px-5 py-4 text-xs text-ink-600 sm:px-6">
                 <template v-if="merchant.store?.schedules[0]">
-                  {{ formatTimeRange(merchant.store.schedules[0].pickupStart, merchant.store.schedules[0].pickupEnd) }}
+                  {{
+                    formatTimeRange(
+                      merchant.store.schedules[0].pickupStart,
+                      merchant.store.schedules[0].pickupEnd,
+                    )
+                  }}
                 </template>
-                <span v-else class="text-stone-400">Belum diatur</span>
+                <span v-else class="text-ink-500">Belum diatur</span>
               </td>
-              <td class="whitespace-nowrap px-4 py-4 text-right font-mono text-sm font-bold text-stone-800 sm:px-5">
+              <td
+                class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-bold text-ink-900 sm:px-6"
+              >
                 {{ merchant.store?.totalStock ?? 0 }}
               </td>
-              <td class="whitespace-nowrap px-4 py-4 sm:px-5">
+              <td class="whitespace-nowrap px-5 py-4 sm:px-6">
                 <StatusBadge v-if="merchant.store" :status="merchant.store.status" />
-                <span v-else class="text-xs text-stone-400">—</span>
+                <span v-else class="text-xs text-ink-500">—</span>
               </td>
-              <td class="whitespace-nowrap px-4 py-4 text-xs text-stone-500 sm:px-5">
+              <td class="whitespace-nowrap px-5 py-4 text-xs text-ink-600 sm:px-6">
                 {{ formatDate(merchant.createdAt) }}
               </td>
             </tr>

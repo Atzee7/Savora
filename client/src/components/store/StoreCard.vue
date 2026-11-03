@@ -3,10 +3,21 @@ import { computed } from 'vue'
 
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import type { Store } from '@/types'
+import { formatDistance } from '@/utils/distance'
 import { formatRupiah, formatTimeRange } from '@/utils/format'
 import { storeImage } from '@/utils/storeImage'
 
-const props = defineProps<{ store: Store }>()
+const props = withDefaults(
+  defineProps<{
+    store: Store
+    distanceKm?: number | null
+    isNearest?: boolean
+  }>(),
+  {
+    distanceKm: null,
+    isNearest: false,
+  },
+)
 
 const cheapestTier = computed(() =>
   props.store.tiers.reduce<(typeof props.store.tiers)[number] | undefined>(
@@ -57,6 +68,33 @@ const pickupLabel = computed(() => {
 
     <div class="flex flex-1 flex-col gap-3 p-5">
       <p class="line-clamp-2 text-sm leading-relaxed text-ink-600">{{ store.address }}</p>
+
+      <div v-if="distanceKm !== null" class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-2.5 py-1 text-[11px] font-bold text-brand-700"
+        >
+          <svg
+            class="h-3 w-3"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10Z" />
+            <circle cx="12" cy="11" r="2.2" />
+          </svg>
+          {{ formatDistance(distanceKm) }} dari lokasi kamu
+        </span>
+        <span
+          v-if="isNearest"
+          class="rounded-full bg-ink-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white"
+        >
+          Terdekat
+        </span>
+      </div>
 
       <div class="mt-auto flex items-center justify-between gap-3 pt-1">
         <span v-if="cheapestTier" class="text-sm font-extrabold tracking-tight text-ink-950">
